@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mercado Pago PIX - Login</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 900px; margin: 20px auto; padding: 0 16px; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .card { border: 1px solid #ddd; border-radius: 10px; padding: 16px; }
+        input, button { width: 100%; padding: 10px; margin: 6px 0; box-sizing: border-box; }
+        button { cursor: pointer; }
+        .error { background: #ffe5e5; color: #8f1111; padding: 10px; border-radius: 8px; margin-bottom: 12px; }
+        .ok { background: #e8ffe8; color: #0f5a0f; padding: 10px; border-radius: 8px; margin-bottom: 12px; }
+    </style>
+</head>
+<body>
+    <h1>Área segura - Mercado Pago PIX</h1>
+
+    <% if (error) { %>
+        <div class="error"><%= error %></div>
+    <% } %>
+
+    <% if (message) { %>
+        <div class="ok"><%= message %></div>
+    <% } %>
+
+    <div class="grid">
+        <section class="card">
+            <h2>Criar conta</h2>
+            <form action="/register" method="POST" autocomplete="off">
+                <input type="hidden" name="csrfToken" value="<%= csrfToken %>" />
+                <label>Nome de usuário</label>
+                <input type="text" name="username" minlength="3" maxlength="80" required />
+
+                <label>Nome completo</label>
+                <input type="text" name="fullName" minlength="3" maxlength="120" required />
+
+                <label>E-mail</label>
+                <input type="email" name="email" required />
+
+                <label>Telefone</label>
+                <input type="tel" name="phone" maxlength="20" required />
+
+                <label>CPF</label>
+                <input type="text" name="documentNumber" maxlength="20" required />
+
+                <label>Data de nascimento</label>
+                <input type="date" name="birthDate" required />
+
+                <label>Senha (mínimo 8 caracteres)</label>
+                <input type="password" name="password" minlength="8" required />
+
+                <button type="submit">Cadastrar</button>
+            </form>
+        </section>
+
+        <section class="card">
+            <h2>Entrar</h2>
+            <form action="/login" method="POST" autocomplete="off">
+                <input type="hidden" name="csrfToken" value="<%= csrfToken %>" />
+                <label>E-mail</label>
+                <input type="email" name="email" required />
+
+                <label>Senha</label>
+                <input type="password" name="password" required />
+
+                <button type="submit">Login</button>
+            </form>
+        </section>
+    </div>
+</body>
+</html>
