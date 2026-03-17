@@ -159,17 +159,13 @@
                     </div>
                 </div>
 
-                <div class="grid2" style="margin-top:10px;">
-                    <div>
-                        <label>Cupom de caravana (opcional)</label>
-                        <input type="text" name="caravanCouponCode" placeholder="ex: caravana_rionovo" />
-                    </div>
-                    <div>
-                        <label>Cupom de líder (opcional)</label>
-                        <input type="text" name="leaderCouponCode" placeholder="ex: lider_rionovo" />
-                    </div>
+                <div style="margin-top:10px;">
+                    <label>Cupom de desconto (opcional)</label>
+                    <input type="text" id="couponInput" placeholder="ex: caravana_rionovo ou lider_rionovo" />
+                    <input type="hidden" name="caravanCouponCode" id="caravanCouponCode" />
+                    <input type="hidden" name="leaderCouponCode" id="leaderCouponCode" />
                 </div>
-                <div class="muted">Você pode usar 1 cupom de caravana e 1 cupom de líder na mesma compra.</div>
+                <div class="muted">Apenas 1 cupom por compra (caravana ou líder).</div>
             </section>
 
             <aside class="card">
@@ -177,7 +173,7 @@
                 <div class="summary-row"><span>Sem almoço</span><strong id="lineWithout">R$ 1.00</strong></div>
                 <div class="summary-row"><span>Com almoço</span><strong id="lineWith">R$ 0.00</strong></div>
                 <div class="summary-total"><span>Total estimado</span><span id="total">R$ 1.00</span></div>
-                <p class="muted">O desconto é calculado no backend. Cupom de líder vale só para 1 ingresso da compra.</p>
+                <p class="muted">O desconto é calculado ao finalizar. Cupom de líder vale só para 1 ingresso da compra.</p>
 
                 <div class="payment-options">
                     <label class="payment-option">
@@ -250,6 +246,31 @@
             const paymentMethodInputs = document.querySelectorAll('input[name="paymentMethod"]');
             const cardBlock = document.getElementById('card-block');
             const cardError = document.getElementById('card-error');
+            const couponInput = document.getElementById('couponInput');
+            const caravanCouponCodeInput = document.getElementById('caravanCouponCode');
+            const leaderCouponCodeInput = document.getElementById('leaderCouponCode');
+
+            // Conjunto de prefixos que identificam cupons de líder (case-insensitive)
+            const LEADER_PREFIXES = ['lider', 'líder'];
+
+            function routeCoupon(value) {
+                const code = value.trim().toLowerCase();
+                const isLeader = LEADER_PREFIXES.some((p) => code.startsWith(p));
+                if (isLeader) {
+                    leaderCouponCodeInput.value = code;
+                    caravanCouponCodeInput.value = '';
+                } else if (code) {
+                    caravanCouponCodeInput.value = code;
+                    leaderCouponCodeInput.value = '';
+                } else {
+                    caravanCouponCodeInput.value = '';
+                    leaderCouponCodeInput.value = '';
+                }
+            }
+
+            if (couponInput) {
+                couponInput.addEventListener('input', () => routeCoupon(couponInput.value));
+            }
 
             let cardForm = null;
             let cardFormInitialized = false;
@@ -349,6 +370,12 @@
             qtyWithout.addEventListener('input', render);
             qtyWith.addEventListener('input', render);
             paymentMethodInputs.forEach((input) => input.addEventListener('change', render));
+
+            // Garante que o cupom seja roteado mesmo quando o form é submetido sem ter disparado 'input'
+            document.getElementById('checkout-form').addEventListener('submit', () => {
+                if (couponInput) routeCoupon(couponInput.value);
+            });
+
             render();
         })();
     </script>

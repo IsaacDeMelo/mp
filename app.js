@@ -302,6 +302,15 @@ app.post('/checkout', requireCsrf, async (req, res) => {
     });
   }
 
+  if (caravanCouponInput && leaderCouponInput) {
+    return res.status(400).render('index', {
+      error: 'Use apenas 1 cupom por compra. Não é possível combinar cupom de caravana e de líder.',
+      message: null,
+      prices: { base: BASE_TICKET_PRICE, lunch: LUNCH_ADDON_PRICE },
+      publicKey: process.env.MERCADO_PAGO_PUBLIC_KEY
+    });
+  }
+
   let caravanCoupon = null;
   let leaderCoupon = null;
 
