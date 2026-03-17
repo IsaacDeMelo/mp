@@ -3,151 +3,82 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Dashboard PIX</title>
+  <title>Pagamento PIX</title>
   <style>
-    body { font-family: Arial, sans-serif; max-width: 1050px; margin: 20px auto; padding: 0 16px; }
-    .top { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 16px; }
+    body { font-family: Arial, sans-serif; max-width: 760px; margin: 24px auto; padding: 0 16px; }
     .card { border: 1px solid #ddd; border-radius: 10px; padding: 16px; }
-    input, button { width: 100%; padding: 10px; margin: 6px 0; box-sizing: border-box; }
-    button { cursor: pointer; }
-    table { width: 100%; border-collapse: collapse; }
-    th, td { border-bottom: 1px solid #eee; padding: 8px; text-align: left; font-size: 14px; }
-    .error { background: #ffe5e5; color: #8f1111; padding: 10px; border-radius: 8px; margin-bottom: 12px; }
-    .ok { background: #e8ffe8; color: #0f5a0f; padding: 10px; border-radius: 8px; margin-bottom: 12px; }
+    .mono { font-family: Consolas, monospace; font-size: 12px; word-break: break-all; }
+    .small { font-size: 12px; color: #555; }
     .status-pending { color: #856404; }
     .status-approved { color: #155724; font-weight: 700; }
     .status-rejected, .status-cancelled { color: #721c24; font-weight: 700; }
-    .mono { font-family: Consolas, monospace; font-size: 12px; word-break: break-all; }
-    .small { font-size: 12px; color: #555; }
   </style>
 </head>
 <body>
-  <div class="top">
-    <div>
-      <h1>Olá, <%= currentUser.fullName || currentUser.username %></h1>
-      <p class="small"><%= currentUser.email %> • <%= currentUser.phone || '-' %></p>
-    </div>
-    <form action="/logout" method="POST">
-      <input type="hidden" name="csrfToken" value="<%= csrfToken %>" />
-      <button type="submit">Sair</button>
-    </form>
-  </div>
+  <h1>Pagamento da inscrição</h1>
 
-  <% if (error) { %>
-    <div class="error"><%= error %></div>
-  <% } %>
-
-  <% if (message) { %>
-    <div class="ok"><%= message %></div>
-  <% } %>
-
-  <div class="grid">
-    <section class="card">
-      <h2>Criar cobrança PIX</h2>
-      <form action="/payments/create" method="POST">
-        <input type="hidden" name="csrfToken" value="<%= csrfToken %>" />
-        <p class="small">Ingresso: R$ 1,00</p>
-        <label>
-          <input type="checkbox" name="withLunch" value="1" style="width:auto; margin-right:8px;" />
-          Adicional de almoço (+ R$ 0,50)
-        </label>
-        <button type="submit">Gerar pagamento</button>
-      </form>
-
-      <% if (currentPayment) { %>
-        <hr />
-        <h3>Pagamento atual</h3>
-        <p>ID local: <span class="mono"><%= currentPayment.localPaymentId %></span></p>
-        <p>
-          Status:
-          <strong id="payment-status" class="status-<%= currentPayment.status %>"><%= currentPayment.status %></strong>
-          <% if (currentPayment.statusDetail) { %>
-            <span class="small">(<%= currentPayment.statusDetail %>)</span>
-          <% } %>
-        </p>
-        <p>Valor: R$ <%= Number(currentPayment.amount).toFixed(2) %></p>
-        <p class="small">
-          Composição: ingresso R$ <%= Number(currentPayment.baseAmount || 1).toFixed(2) %>
-          <% if (currentPayment.withLunch) { %> + almoço R$ <%= Number(currentPayment.lunchAddon || 0.5).toFixed(2) %><% } %>
-        </p>
-
-        <% if (currentPayment.qrCodeBase64) { %>
-          <img alt="QR Code PIX" width="240" src="data:image/png;base64,<%= currentPayment.qrCodeBase64 %>" />
-        <% } %>
-
-        <% if (currentPayment.qrCode) { %>
-          <p class="small">Copia e cola PIX:</p>
-          <p class="mono"><%= currentPayment.qrCode %></p>
-        <% } %>
-
-        <p class="small">Última atualização: <span id="updated-at"><%= currentPayment.updatedAt %></span></p>
-
-        <script>
-          (function () {
-            const paymentId = "<%= currentPayment.localPaymentId %>";
-            let active = true;
-
-            async function pollStatus() {
-              if (!active) return;
-              try {
-                const response = await fetch(`/payments/${paymentId}/status`, { headers: { 'Accept': 'application/json' } });
-                if (!response.ok) return;
-                const data = await response.json();
-                const statusEl = document.getElementById('payment-status');
-                const updatedAtEl = document.getElementById('updated-at');
-
-                if (statusEl) {
-                  statusEl.textContent = data.status;
-                  statusEl.className = `status-${data.status}`;
-                }
-                if (updatedAtEl) {
-                  updatedAtEl.textContent = data.updatedAt;
-                }
-
-                if (data.status !== 'pending') {
-                  active = false;
-                }
-              } catch (e) {
-                // ignora falha momentânea
-              }
-            }
-
-            if ("<%= currentPayment.status %>" === 'pending') {
-              setInterval(pollStatus, 5000);
-            }
-          })();
-        </script>
+  <section class="card">
+    <p><strong>Participante:</strong> <%= currentPayment.buyerName %></p>
+    <p><strong>E-mail:</strong> <%= currentPayment.buyerEmail %></p>
+    <p><strong>Qtd sem almoço:</strong> <%= currentPayment.quantityWithoutLunch %></p>
+    <p><strong>Qtd com almoço:</strong> <%= currentPayment.quantityWithLunch %></p>
+    <p><strong>Subtotal:</strong> R$ <%= Number(currentPayment.subtotalAmount).toFixed(2) %></p>
+    <p><strong>Desconto:</strong> R$ <%= Number(currentPayment.discountAmount || 0).toFixed(2) %> <% if (currentPayment.couponCode) { %>(cupom: <%= currentPayment.couponCode %>)<% } %></p>
+    <p><strong>Total:</strong> R$ <%= Number(currentPayment.amount).toFixed(2) %></p>
+    <p>
+      Status:
+      <strong id="payment-status" class="status-<%= currentPayment.status %>"><%= currentPayment.status %></strong>
+      <% if (currentPayment.statusDetail) { %>
+        <span class="small">(<%= currentPayment.statusDetail %>)</span>
       <% } %>
-    </section>
+    </p>
 
-    <section class="card">
-      <h2>Histórico de transações</h2>
-      <% if (!transactions || transactions.length === 0) { %>
-        <p>Nenhuma transação ainda.</p>
-      <% } else { %>
-        <table>
-          <thead>
-            <tr>
-              <th>Data</th>
-              <th>Valor</th>
-              <th>Status</th>
-              <th>Ação</th>
-            </tr>
-          </thead>
-          <tbody>
-            <% transactions.forEach(function(tx) { %>
-              <tr>
-                <td><%= tx.createdAt %></td>
-                <td>R$ <%= Number(tx.amount).toFixed(2) %></td>
-                <td class="status-<%= tx.status %>"><%= tx.status %></td>
-                <td><a href="/payments/<%= tx.localPaymentId %>">abrir</a></td>
-              </tr>
-            <% }) %>
-          </tbody>
-        </table>
-      <% } %>
-    </section>
-  </div>
+    <% if (currentPayment.qrCodeBase64) { %>
+      <img alt="QR Code PIX" width="240" src="data:image/png;base64,<%= currentPayment.qrCodeBase64 %>" />
+    <% } %>
+
+    <% if (currentPayment.qrCode) { %>
+      <p class="small">Copia e cola PIX:</p>
+      <p class="mono"><%= currentPayment.qrCode %></p>
+    <% } %>
+
+    <p class="small">Última atualização: <span id="updated-at"><%= currentPayment.updatedAt %></span></p>
+  </section>
+
+  <script>
+    (function () {
+      const paymentId = "<%= currentPayment.localPaymentId %>";
+      let active = true;
+
+      async function pollStatus() {
+        if (!active) return;
+        try {
+          const response = await fetch(`/payments/${paymentId}/status`, { headers: { Accept: 'application/json' } });
+          if (!response.ok) return;
+          const data = await response.json();
+          const statusEl = document.getElementById('payment-status');
+          const updatedAtEl = document.getElementById('updated-at');
+
+          if (statusEl) {
+            statusEl.textContent = data.status;
+            statusEl.className = `status-${data.status}`;
+          }
+          if (updatedAtEl) {
+            updatedAtEl.textContent = data.updatedAt;
+          }
+
+          if (data.status !== 'pending') {
+            active = false;
+          }
+        } catch (e) {
+          // ignora falha momentânea
+        }
+      }
+
+      if ("<%= currentPayment.status %>" === 'pending') {
+        setInterval(pollStatus, 5000);
+      }
+    })();
+  </script>
 </body>
 </html>

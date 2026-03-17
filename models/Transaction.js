@@ -11,25 +11,71 @@ const TransactionSchema = new mongoose.Schema(
     userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
+      required: false,
+      index: true
+    },
+    buyerName: {
+      type: String,
       required: true,
+      trim: true,
+      maxlength: 120
+    },
+    buyerEmail: {
+      type: String,
+      required: true,
+      trim: true,
+      lowercase: true,
+      index: true
+    },
+    buyerPhone: {
+      type: String,
+      required: false,
+      trim: true,
+      maxlength: 30
+    },
+    quantityWithoutLunch: {
+      type: Number,
+      required: true,
+      min: 0,
+      default: 0
+    },
+    quantityWithLunch: {
+      type: Number,
+      required: true,
+      min: 0,
+      default: 0
+    },
+    baseTicketPrice: {
+      type: Number,
+      required: true,
+      default: 1
+    },
+    lunchAddonPrice: {
+      type: Number,
+      required: true,
+      default: 0.5
+    },
+    subtotalAmount: {
+      type: Number,
+      required: true,
+      min: 0.01
+    },
+    discountAmount: {
+      type: Number,
+      required: true,
+      default: 0
+    },
+    couponCode: {
+      type: String,
+      default: null,
+      lowercase: true,
+      trim: true,
       index: true
     },
     amount: {
       type: Number,
       required: true,
       min: 0.01
-    },
-    baseAmount: {
-      type: Number,
-      default: 1
-    },
-    lunchAddon: {
-      type: Number,
-      default: 0
-    },
-    withLunch: {
-      type: Boolean,
-      default: false
     },
     status: {
       type: String,
