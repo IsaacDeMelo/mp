@@ -1,9 +1,13 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Inscrição e pagamento PIX</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Hachi+Maru+Pop&display=swap" rel="stylesheet" />
     <style>
         :root {
             --bg: #f6f7fb;
@@ -15,32 +19,47 @@
             --danger-bg: #ffe5e5;
             --danger-text: #8f1111;
         }
-        * { box-sizing: border-box; }
+
+        * {
+            box-sizing: border-box;
+        }
+
         body {
             margin: 0;
             font-family: Inter, Arial, sans-serif;
             background: var(--bg);
             color: var(--text);
         }
+
         .container {
             max-width: 1000px;
             margin: 28px auto;
             padding: 0 16px;
         }
-        .title { margin: 0 0 6px; }
-        .subtitle { margin: 0 0 18px; color: var(--muted); }
+
+        .title {
+            margin: 0 0 6px;
+        }
+
+        .subtitle {
+            margin: 0 0 18px;
+            color: var(--muted);
+        }
+
         .layout {
             display: grid;
             grid-template-columns: 1.3fr 0.9fr;
             gap: 18px;
             align-items: start;
         }
+
         .card {
             background: var(--card);
             border: 1px solid var(--line);
             border-radius: 14px;
             padding: 18px;
         }
+
         .error {
             background: var(--danger-bg);
             color: var(--danger-text);
@@ -48,22 +67,43 @@
             padding: 10px;
             margin-bottom: 12px;
         }
-        h2 { margin-top: 0; font-size: 18px; }
-        label { display: block; margin: 10px 0 4px; font-size: 14px; }
+
+        h2 {
+            margin-top: 0;
+            font-size: 18px;
+        }
+
+        label {
+            display: block;
+            margin: 10px 0 4px;
+            font-size: 14px;
+        }
+
         input {
             width: 100%;
             padding: 10px;
             border: 1px solid var(--line);
             border-radius: 10px;
         }
-        .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        .muted { color: var(--muted); font-size: 13px; }
+
+        .grid2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .muted {
+            color: var(--muted);
+            font-size: 13px;
+        }
+
         .summary-row {
             display: flex;
             justify-content: space-between;
             margin: 8px 0;
             font-size: 14px;
         }
+
         .summary-total {
             margin-top: 12px;
             padding-top: 12px;
@@ -73,7 +113,13 @@
             display: flex;
             justify-content: space-between;
         }
-        .payment-options { display: grid; gap: 10px; margin-top: 14px; }
+
+        .payment-options {
+            display: grid;
+            gap: 10px;
+            margin-top: 14px;
+        }
+
         .payment-option {
             border: 1px solid var(--line);
             border-radius: 12px;
@@ -83,10 +129,29 @@
             align-items: flex-start;
             background: #fafafa;
         }
-        .payment-option input { width: auto; margin-top: 4px; }
-        .card-block { margin-top: 14px; border: 1px solid var(--line); border-radius: 12px; padding: 12px; display: none; }
-        .card-block.active { display: block; }
-        .card-block input, .card-block select { margin-top: 6px; }
+
+        .payment-option input {
+            width: auto;
+            margin-top: 4px;
+        }
+
+        .card-block {
+            margin-top: 14px;
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            padding: 12px;
+            display: none;
+        }
+
+        .card-block.active {
+            display: block;
+        }
+
+        .card-block input,
+        .card-block select {
+            margin-top: 6px;
+        }
+
         /* Containers dos iframes seguros do Mercado Pago */
         #form-checkout__cardNumber,
         #form-checkout__expirationDate,
@@ -96,8 +161,22 @@
             margin-top: 6px;
             background: #fff;
         }
-        .card-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-        .alert { background: #fff7ed; color: #9a3412; padding: 10px; border-radius: 10px; margin: 10px 0; display: none; }
+
+        .card-row2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .alert {
+            background: #fff7ed;
+            color: #9a3412;
+            padding: 10px;
+            border-radius: 10px;
+            margin: 10px 0;
+            display: none;
+        }
+
         button {
             width: 100%;
             margin-top: 14px;
@@ -109,126 +188,102 @@
             font-weight: 600;
             cursor: pointer;
         }
+
         @media (max-width: 840px) {
-            .layout { grid-template-columns: 1fr; }
+            .layout {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .event-image-wrap {
+            width: 100%;
+            background: linear-gradient(135deg, #49ffdd 0%, #2563eb 60%, #80e0f7 100%);
+            display: flex;
+            justify-content: center;
+        }
+
+        .event-image {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            width: 100%;
+            height: auto;
+            max-width: 1600px;
+            margin-bottom: 120px; 
         }
     </style>
-    <script src="https://sdk.mercadopago.com/js/v2"></script>
 </head>
+
 <body>
-    <main class="container" data-base-price="<%= Number(prices.base).toFixed(2) %>" data-lunch-price="<%= Number(prices.lunch).toFixed(2) %>">
-        <h1 class="title">Finalizar inscrição</h1>
+    <div class="event-image-wrap">
+        <img class="event-image" src="/2026 (3).png" alt="Banner 2026" />
+    </div>
+    <main class="container" data-base-price="<%= Number(prices.base).toFixed(2) %>"
+        data-lunch-price="<%= Number(prices.lunch).toFixed(2) %>">
+        <h1 class="title">Inscrição</h1>
         <p class="subtitle">Escolha as quantidades como em um carrinho e gere o PIX em um clique.</p>
 
         <% if (error) { %>
-            <div class="error"><%= error %></div>
-        <% } %>
+            <div class="error">
+                <%= error %>
+            </div>
+            <% } %>
 
-        <form id="checkout-form" action="/checkout" method="POST" autocomplete="off" class="layout">
-            <input type="hidden" name="csrfToken" value="<%= csrfToken %>" />
-            <input type="hidden" name="cardToken" id="cardToken" />
-            <input type="hidden" name="cardPaymentMethodId" id="cardPaymentMethodId" />
-            <input type="hidden" name="cardIssuerId" id="cardIssuerId" />
-            <input type="hidden" name="cardInstallments" id="cardInstallments" />
-            <input type="hidden" name="cardIdentificationType" id="cardIdentificationType" />
-            <input type="hidden" name="cardIdentificationNumber" id="cardIdentificationNumberHidden" />
-            <input type="hidden" name="cardEmail" id="cardEmailHidden" />
+                <form id="checkout-form" action="/checkout" method="POST" autocomplete="off" class="layout">
+                    <input type="hidden" name="csrfToken" value="<%= csrfToken %>" />
 
-            <section class="card">
-                <h2>Dados do responsável</h2>
-                <label>Nome completo</label>
-                <input type="text" name="buyerName" required maxlength="120" />
+                    <section class="card">
+                        <h2>Dados do responsável</h2>
+                        <label>Nome completo</label>
+                        <input type="text" name="buyerName" required maxlength="120" />
 
-                <label>E-mail</label>
-                <input type="email" name="buyerEmail" required />
+                        <label>E-mail</label>
+                        <input type="email" name="buyerEmail" required />
 
-                <label>Telefone (opcional)</label>
-                <input type="tel" name="buyerPhone" maxlength="30" />
+                        <label>Telefone (opcional)</label>
+                        <input type="tel" name="buyerPhone" maxlength="30" />
 
-                <h2 style="margin-top:16px;">Seu carrinho</h2>
-                <div class="grid2">
-                    <div>
-                        <label>Ingressos sem almoço</label>
-                        <input id="qtyWithout" type="number" name="quantityWithoutLunch" min="0" step="1" value="1" required />
-                        <div class="muted">R$ <%= Number(prices.base).toFixed(2) %> por ingresso</div>
-                    </div>
-                    <div>
-                        <label>Ingressos com almoço</label>
-                        <input id="qtyWith" type="number" name="quantityWithLunch" min="0" step="1" value="0" required />
-                        <div class="muted">R$ <%= Number(prices.base + prices.lunch).toFixed(2) %> por ingresso</div>
-                    </div>
-                </div>
-
-                <div style="margin-top:10px;">
-                    <label>Cupom de desconto (opcional)</label>
-                    <input type="text" id="couponInput" placeholder="ex: caravana_rionovo ou lider_rionovo" />
-                    <input type="hidden" name="caravanCouponCode" id="caravanCouponCode" />
-                    <input type="hidden" name="leaderCouponCode" id="leaderCouponCode" />
-                </div>
-                <div class="muted">Apenas 1 cupom por compra (caravana ou líder).</div>
-            </section>
-
-            <aside class="card">
-                <h2>Resumo do pedido</h2>
-                <div class="summary-row"><span>Sem almoço</span><strong id="lineWithout">R$ 1.00</strong></div>
-                <div class="summary-row"><span>Com almoço</span><strong id="lineWith">R$ 0.00</strong></div>
-                <div class="summary-total"><span>Total estimado</span><span id="total">R$ 1.00</span></div>
-                <p class="muted">O desconto é calculado ao finalizar. Cupom de líder vale só para 1 ingresso da compra.</p>
-
-                <div class="payment-options">
-                    <label class="payment-option">
-                        <input type="radio" name="paymentMethod" value="pix" checked />
-                        <span>
-                            <strong>PIX</strong><br />
-                            <span class="muted">Gera QR Code e chave copia-e-cola na hora.</span>
-                        </span>
-                    </label>
-                    <label class="payment-option">
-                        <input type="radio" name="paymentMethod" value="card" />
-                        <span>
-                            <strong>Cartão</strong><br />
-                            <span class="muted">Pagamento com cartão direto aqui, com segurança do Mercado Pago.</span>
-                        </span>
-                    </label>
-                </div>
-
-                <div id="card-block" class="card-block">
-                    <h3 style="margin:0 0 8px;">Dados do cartão</h3>
-                    <div id="card-error" class="alert"></div>
-                    <label style="font-size:13px;">Número do cartão</label>
-                    <div id="form-checkout__cardNumber"></div>
-                    <div class="card-row2" style="margin-top:0;">
-                        <div>
-                            <label style="font-size:13px;">Validade (MM/AA)</label>
-                            <div id="form-checkout__expirationDate"></div>
+                        <h2 style="margin-top:16px;">Seu carrinho</h2>
+                        <div class="grid2">
+                            <div>
+                                <label>Ingressos sem almoço</label>
+                                <input id="qtyWithout" type="number" name="quantityWithoutLunch" min="0" step="1"
+                                    value="1" required />
+                                <div class="muted">R$ <%= Number(prices.base).toFixed(2) %> por ingresso</div>
+                            </div>
+                            <div>
+                                <label>Ingressos com almoço</label>
+                                <input id="qtyWith" type="number" name="quantityWithLunch" min="0" step="1" value="0"
+                                    required />
+                                <div class="muted">R$ <%= Number(prices.base + prices.lunch).toFixed(2) %> por ingresso
+                                </div>
+                            </div>
                         </div>
-                        <div>
-                            <label style="font-size:13px;">CVV</label>
-                            <div id="form-checkout__securityCode"></div>
-                        </div>
-                    </div>
-                    <label style="font-size:13px;">Nome no cartão</label>
-                    <input type="text" id="form-checkout__cardholderName" placeholder="Como aparece no cartão" />
-                    <label style="font-size:13px;">Parcelas</label>
-                    <select id="form-checkout__installments" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:10px;margin-top:6px;background:#fff;"></select>
-                    <select id="form-checkout__issuer" style="display:none;"></select>
-                    <div class="card-row2" style="margin-top:4px;">
-                        <div>
-                            <label style="font-size:13px;">Tipo de documento</label>
-                            <select id="form-checkout__identificationType" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:10px;margin-top:6px;background:#fff;"></select>
-                        </div>
-                        <div>
-                            <label style="font-size:13px;">Número do documento</label>
-                            <input type="text" id="form-checkout__identificationNumber" placeholder="CPF do titular" />
-                        </div>
-                    </div>
-                    <label style="font-size:13px;">E-mail do titular</label>
-                    <input type="email" id="form-checkout__cardholderEmail" placeholder="E-mail do titular" />
-                </div>
 
-                <button type="submit">Gerar PIX</button>
-            </aside>
-        </form>
+                        <div style="margin-top:10px;">
+                            <label>Cupom de desconto (opcional)</label>
+                            <input type="text" id="couponInput" placeholder="ex: caravana_rionovo ou lider_rionovo" />
+                            <input type="hidden" name="caravanCouponCode" id="caravanCouponCode" />
+                            <input type="hidden" name="leaderCouponCode" id="leaderCouponCode" />
+                        </div>
+                        <div class="muted">Apenas 1 cupom por compra (caravana ou líder).</div>
+                    </section>
+
+                    <aside class="card">
+                        <h2>Resumo do pedido</h2>
+                        <div class="summary-row"><span>Sem almoço</span><strong id="lineWithout">R$ 1.00</strong></div>
+                        <div class="summary-row"><span>Com almoço</span><strong id="lineWith">R$ 0.00</strong></div>
+                        <div class="summary-total"><span>Total estimado</span><span id="total">R$ 1.00</span></div>
+                        <p class="muted">O desconto é calculado ao finalizar. Cupom de líder vale só para 1 ingresso da
+                            compra.</p>
+
+                        <input type="hidden" name="paymentMethod" value="pix" />
+                        <p class="muted">Pagamento disponível no momento: PIX.</p>
+
+                        <button type="submit">Gerar PIX</button>
+                    </aside>
+                </form>
     </main>
 
     <script>
@@ -241,11 +296,6 @@
             const lineWithout = document.getElementById('lineWithout');
             const lineWith = document.getElementById('lineWith');
             const total = document.getElementById('total');
-            const form = document.getElementById('checkout-form');
-            const submitButton = document.querySelector('button[type="submit"]');
-            const paymentMethodInputs = document.querySelectorAll('input[name="paymentMethod"]');
-            const cardBlock = document.getElementById('card-block');
-            const cardError = document.getElementById('card-error');
             const couponInput = document.getElementById('couponInput');
             const caravanCouponCodeInput = document.getElementById('caravanCouponCode');
             const leaderCouponCodeInput = document.getElementById('leaderCouponCode');
@@ -272,9 +322,6 @@
                 couponInput.addEventListener('input', () => routeCoupon(couponInput.value));
             }
 
-            let cardForm = null;
-            let cardFormInitialized = false;
-
             function safeInt(v) {
                 const n = Number(v);
                 return Number.isInteger(n) && n > 0 ? n : 0;
@@ -290,86 +337,10 @@
                 lineWithout.textContent = `R$ ${valueWithout.toFixed(2)}`;
                 lineWith.textContent = `R$ ${valueWith.toFixed(2)}`;
                 total.textContent = `R$ ${grandTotal.toFixed(2)}`;
-
-                const selectedMethod = Array.from(paymentMethodInputs).find((input) => input.checked)?.value || 'pix';
-                if (submitButton) {
-                    submitButton.textContent = selectedMethod === 'card' ? 'Pagar com cartão' : 'Gerar PIX';
-                }
-                if (cardBlock) {
-                    cardBlock.classList.toggle('active', selectedMethod === 'card');
-                }
-                if (selectedMethod === 'card' && !cardFormInitialized) {
-                    initializeCardForm();
-                }
-            }
-
-            function initializeCardForm() {
-                if (cardFormInitialized) return;
-
-                if (typeof MercadoPago === 'undefined') {
-                    // SDK ainda carregando — tenta novamente em 300ms
-                    setTimeout(initializeCardForm, 300);
-                    return;
-                }
-
-                cardFormInitialized = true;
-                const mp = new MercadoPago('<%= publicKey %>', { locale: 'pt-BR' });
-                const currentAmount = String(
-                    (safeInt(qtyWithout.value) * base + safeInt(qtyWith.value) * (base + lunch)).toFixed(2)
-                ) || '1.00';
-
-                cardForm = mp.cardForm({
-                    amount: currentAmount,
-                    iframe: true,
-                    form: {
-                        id: 'checkout-form',
-                        cardNumber: { id: 'form-checkout__cardNumber', placeholder: 'Número do cartão' },
-                        expirationDate: { id: 'form-checkout__expirationDate', placeholder: 'MM/AA' },
-                        securityCode: { id: 'form-checkout__securityCode', placeholder: 'CVV' },
-                        cardholderName: { id: 'form-checkout__cardholderName', placeholder: 'Nome no cartão' },
-                        issuer: { id: 'form-checkout__issuer' },
-                        installments: { id: 'form-checkout__installments' },
-                        identificationType: { id: 'form-checkout__identificationType' },
-                        identificationNumber: { id: 'form-checkout__identificationNumber', placeholder: 'CPF do titular' },
-                        cardholderEmail: { id: 'form-checkout__cardholderEmail', placeholder: 'E-mail do titular' }
-                    },
-                    callbacks: {
-                        onFormMounted: function(err) {
-                            if (err) console.warn('cardForm mount error:', err);
-                        },
-                        onSubmit: function (event) {
-                            const selectedMethod = Array.from(paymentMethodInputs).find((input) => input.checked)?.value || 'pix';
-                            if (selectedMethod !== 'card') return;
-
-                            event.preventDefault();
-                            if (cardError) { cardError.style.display = 'none'; cardError.textContent = ''; }
-
-                            const data = cardForm.getCardFormData();
-                            document.getElementById('cardToken').value = data.token || '';
-                            document.getElementById('cardPaymentMethodId').value = data.paymentMethodId || '';
-                            document.getElementById('cardIssuerId').value = data.issuerId || '';
-                            document.getElementById('cardInstallments').value = data.installments || '1';
-                            document.getElementById('cardIdentificationType').value = data.identificationType || 'CPF';
-                            document.getElementById('cardIdentificationNumberHidden').value = data.identificationNumber || '';
-                            document.getElementById('cardEmailHidden').value = data.cardholderEmail || '';
-
-                            if (!data.token) {
-                                if (cardError) {
-                                    cardError.textContent = 'Não foi possível gerar o token do cartão. Verifique os dados.';
-                                    cardError.style.display = 'block';
-                                }
-                                return;
-                            }
-
-                            form.submit();
-                        }
-                    }
-                });
             }
 
             qtyWithout.addEventListener('input', render);
             qtyWith.addEventListener('input', render);
-            paymentMethodInputs.forEach((input) => input.addEventListener('change', render));
 
             // Garante que o cupom seja roteado mesmo quando o form é submetido sem ter disparado 'input'
             document.getElementById('checkout-form').addEventListener('submit', () => {
@@ -380,4 +351,5 @@
         })();
     </script>
 </body>
+
 </html>

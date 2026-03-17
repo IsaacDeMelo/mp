@@ -115,6 +115,23 @@ async function refreshPaymentStatus(localPaymentId) {
 
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
+
+function resolveTrustProxy() {
+  const raw = String(process.env.TRUST_PROXY || '1').trim().toLowerCase();
+
+  if (raw === 'true') return true;
+  if (raw === 'false') return false;
+
+  const hops = Number(raw);
+  if (Number.isInteger(hops) && hops >= 0) {
+    return hops;
+  }
+
+  return 1;
+}
+
+app.set('trust proxy', resolveTrustProxy());
+
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 

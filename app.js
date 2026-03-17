@@ -199,8 +199,27 @@ function requireAdminAuth(req, res, next) {
 
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
+
+function resolveTrustProxy() {
+  const raw = String(process.env.TRUST_PROXY || '1').trim().toLowerCase();
+
+  if (raw === 'true') return true;
+  if (raw === 'false') return false;
+
+  const hops = Number(raw);
+  if (Number.isInteger(hops) && hops >= 0) {
+    return hops;
+  }
+
+  // Valor padrão compatível com ambientes atrás de 1 proxy.
+  return 1;
+}
+
+app.set('trust proxy', resolveTrustProxy());
+
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
+app.use(express.static(path.join(__dirname, 'public')));
 
 app.use(
   helmet({
@@ -273,14 +292,7 @@ app.post('/checkout', requireCsrf, async (req, res) => {
   const quantityWithoutLunch = parseQty(req.body.quantityWithoutLunch);
   const quantityWithLunch = parseQty(req.body.quantityWithLunch);
   const totalTickets = quantityWithoutLunch + quantityWithLunch;
-  const paymentMethod = String(req.body.paymentMethod || 'pix').trim().toLowerCase() === 'card' ? 'card' : 'pix';
-  const cardToken = String(req.body.cardToken || '').trim();
-  const cardPaymentMethodId = String(req.body.cardPaymentMethodId || '').trim();
-  const cardIssuerId = String(req.body.cardIssuerId || '').trim();
-  const cardInstallments = Number(req.body.cardInstallments || 1);
-  const cardIdentificationType = String(req.body.cardIdentificationType || 'CPF').trim();
-  const cardIdentificationNumber = String(req.body.cardIdentificationNumber || '').trim();
-  const cardEmail = String(req.body.cardEmail || buyerEmail).trim().toLowerCase();
+  const paymentMethod = 'pix';
   const caravanCouponInput = String(req.body.caravanCouponCode || '').trim().toLowerCase();
   const leaderCouponInput = String(req.body.leaderCouponCode || '').trim().toLowerCase();
 
@@ -358,88 +370,6 @@ app.post('/checkout', requireCsrf, async (req, res) => {
 
   try {
     const webhookUrl = buildWebhookUrl();
-
-    if (paymentMethod === 'card') {
-      if (!cardToken || !cardPaymentMethodId || !cardIdentificationNumber || !cardEmail) {
-        return res.status(400).render('index', {
-          error: 'Dados do cartão incompletos. Preencha o formulário de cartão.',
-          message: null,
-          prices: { base: BASE_TICKET_PRICE, lunch: LUNCH_ADDON_PRICE },
-          publicKey: process.env.MERCADO_PAGO_PUBLIC_KEY
-        });
-      }
-
-      const cardPaymentData = {
-        transaction_amount: amounts.total,
-        token: cardToken,
-        description: `Ingressos: ${totalTickets} (${quantityWithLunch} c/ almoço)`,
-        installments: Number.isFinite(cardInstallments) && cardInstallments > 0 ? cardInstallments : 1,
-        payment_method_id: cardPaymentMethodId,
-        external_reference: localPaymentId,
-        payer: {
-          email: cardEmail,
-          identification: {
-            type: cardIdentificationType || 'CPF',
-            number: cardIdentificationNumber
-          }
-        }
-      };
-
-      if (cardIssuerId) {
-        cardPaymentData.issuer_id = cardIssuerId;
-      }
-      if (webhookUrl) {
-        cardPaymentData.notification_url = webhookUrl;
-      }
-
-      const cardPayment = await mercadopago.payment.create(cardPaymentData);
-
-      await Transaction.create({
-        localPaymentId,
-        buyerName,
-        buyerEmail,
-        buyerPhone,
-        paymentMethod,
-        purchaseType: couponBadgeType(caravanCoupon),
-        quantityWithoutLunch,
-        quantityWithLunch,
-        totalTickets,
-        baseTicketPrice: BASE_TICKET_PRICE,
-        lunchAddonPrice: LUNCH_ADDON_PRICE,
-        subtotalAmount: amounts.subtotal,
-        caravanDiscountAmount: amounts.caravanDiscountAmount,
-        leaderDiscountAmount: amounts.leaderDiscountAmount,
-        discountAmount: amounts.discountAmount,
-        caravanCouponCode: caravanCoupon?.code || null,
-        leaderCouponCode: leaderCoupon?.code || null,
-        couponCode: caravanCoupon?.code || leaderCoupon?.code || null,
-        amount: amounts.total,
-        status: mapMpStatus(cardPayment.body?.status),
-        statusDetail: cardPayment.body?.status_detail || null,
-        mpPaymentId: cardPayment.body?.id ? String(cardPayment.body.id) : null,
-        installments: cardPayment.body?.installments || cardPaymentData.installments,
-        cardFirstSixDigits: cardPayment.body?.card?.first_six_digits || null,
-        cardLastFourDigits: cardPayment.body?.card?.last_four_digits || null,
-        externalReference: localPaymentId,
-        lastCheckedAt: new Date()
-      });
-
-      if (caravanCoupon) {
-        caravanCoupon.usageCount += 1;
-        caravanCoupon.lastUsedAt = new Date();
-        caravanCoupon.lastUsedByPaymentId = localPaymentId;
-        await caravanCoupon.save();
-      }
-
-      if (leaderCoupon) {
-        leaderCoupon.usageCount += 1;
-        leaderCoupon.lastUsedAt = new Date();
-        leaderCoupon.lastUsedByPaymentId = localPaymentId;
-        await leaderCoupon.save();
-      }
-
-      return res.redirect(`/payment/${localPaymentId}`);
-    }
 
     const paymentData = {
       transaction_amount: amounts.total,
