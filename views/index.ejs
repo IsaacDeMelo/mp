@@ -87,6 +87,25 @@
         .card-block { margin-top: 14px; border: 1px solid var(--line); border-radius: 12px; padding: 12px; display: none; }
         .card-block.active { display: block; }
         .card-block input, .card-block select { margin-top: 6px; }
+        /* Containers dos iframes seguros do Mercado Pago */
+        #form-checkout__cardNumber,
+        #form-checkout__expirationDate,
+        #form-checkout__securityCode {
+            height: 42px;
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            margin-top: 6px;
+            overflow: hidden;
+            background: #fff;
+        }
+        #form-checkout__cardNumber iframe,
+        #form-checkout__expirationDate iframe,
+        #form-checkout__securityCode iframe {
+            width: 100% !important;
+            height: 100% !important;
+            border: none;
+        }
+        .card-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
         .alert { background: #fff7ed; color: #9a3412; padding: 10px; border-radius: 10px; margin: 10px 0; display: none; }
         button {
             width: 100%;
@@ -189,14 +208,34 @@
                 <div id="card-block" class="card-block">
                     <h3 style="margin:0 0 8px;">Dados do cartão</h3>
                     <div id="card-error" class="alert"></div>
+                    <label style="font-size:13px;">Número do cartão</label>
                     <div id="form-checkout__cardNumber"></div>
-                    <div id="form-checkout__expirationDate"></div>
-                    <div id="form-checkout__securityCode"></div>
-                    <input type="text" id="form-checkout__cardholderName" placeholder="Nome no cartão" />
-                    <select id="form-checkout__issuer"></select>
-                    <select id="form-checkout__installments"></select>
-                    <select id="form-checkout__identificationType"></select>
-                    <input type="text" id="form-checkout__identificationNumber" placeholder="CPF do titular" />
+                    <div class="card-row2" style="margin-top:0;">
+                        <div>
+                            <label style="font-size:13px;">Validade (MM/AA)</label>
+                            <div id="form-checkout__expirationDate"></div>
+                        </div>
+                        <div>
+                            <label style="font-size:13px;">CVV</label>
+                            <div id="form-checkout__securityCode"></div>
+                        </div>
+                    </div>
+                    <label style="font-size:13px;">Nome no cartão</label>
+                    <input type="text" id="form-checkout__cardholderName" placeholder="Como aparece no cartão" />
+                    <label style="font-size:13px;">Parcelas</label>
+                    <select id="form-checkout__installments" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:10px;margin-top:6px;background:#fff;"></select>
+                    <select id="form-checkout__issuer" style="display:none;"></select>
+                    <div class="card-row2" style="margin-top:4px;">
+                        <div>
+                            <label style="font-size:13px;">Tipo de documento</label>
+                            <select id="form-checkout__identificationType" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:10px;margin-top:6px;background:#fff;"></select>
+                        </div>
+                        <div>
+                            <label style="font-size:13px;">Número do documento</label>
+                            <input type="text" id="form-checkout__identificationNumber" placeholder="CPF do titular" />
+                        </div>
+                    </div>
+                    <label style="font-size:13px;">E-mail do titular</label>
                     <input type="email" id="form-checkout__cardholderEmail" placeholder="E-mail do titular" />
                 </div>
 
