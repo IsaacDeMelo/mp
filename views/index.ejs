@@ -91,19 +91,22 @@
         #form-checkout__cardNumber,
         #form-checkout__expirationDate,
         #form-checkout__securityCode {
-            height: 42px;
+            height: 46px;
             border: 1px solid var(--line);
             border-radius: 10px;
             margin-top: 6px;
-            overflow: hidden;
             background: #fff;
+            position: relative;
         }
         #form-checkout__cardNumber iframe,
         #form-checkout__expirationDate iframe,
         #form-checkout__securityCode iframe {
+            position: absolute;
+            top: 0; left: 0;
             width: 100% !important;
             height: 100% !important;
-            border: none;
+            border: none !important;
+            border-radius: 10px;
         }
         .card-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
         .alert { background: #fff7ed; color: #9a3412; padding: 10px; border-radius: 10px; margin: 10px 0; display: none; }
@@ -292,14 +295,22 @@
             }
 
             function initializeCardForm() {
-                if (typeof MercadoPago === 'undefined' || cardFormInitialized) {
+                if (cardFormInitialized) return;
+
+                if (typeof MercadoPago === 'undefined') {
+                    // SDK ainda carregando — tenta novamente em 300ms
+                    setTimeout(initializeCardForm, 300);
                     return;
                 }
+
                 cardFormInitialized = true;
                 const mp = new MercadoPago('<%= publicKey %>', { locale: 'pt-BR' });
+                const currentAmount = String(
+                    (safeInt(qtyWithout.value) * base + safeInt(qtyWith.value) * (base + lunch)).toFixed(2)
+                ) || '1.00';
 
                 cardForm = mp.cardForm({
-                    amount: total.textContent.replace('R$ ', ''),
+                    amount: currentAmount,
                     iframe: true,
                     form: {
                         id: 'checkout-form',
@@ -314,17 +325,15 @@
                         cardholderEmail: { id: 'form-checkout__cardholderEmail', placeholder: 'E-mail do titular' }
                     },
                     callbacks: {
+                        onFormMounted: function(err) {
+                            if (err) console.warn('cardForm mount error:', err);
+                        },
                         onSubmit: function (event) {
                             const selectedMethod = Array.from(paymentMethodInputs).find((input) => input.checked)?.value || 'pix';
-                            if (selectedMethod !== 'card') {
-                                return;
-                            }
+                            if (selectedMethod !== 'card') return;
 
                             event.preventDefault();
-                            if (cardError) {
-                                cardError.style.display = 'none';
-                                cardError.textContent = '';
-                            }
+                            if (cardError) { cardError.style.display = 'none'; cardError.textContent = ''; }
 
                             const data = cardForm.getCardFormData();
                             document.getElementById('cardToken').value = data.token || '';
@@ -337,7 +346,7 @@
 
                             if (!data.token) {
                                 if (cardError) {
-                                    cardError.textContent = 'Não foi possível gerar o token do cartão.';
+                                    cardError.textContent = 'Não foi possível gerar o token do cartão. Verifique os dados.';
                                     cardError.style.display = 'block';
                                 }
                                 return;
