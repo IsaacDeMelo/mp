@@ -5,7 +5,7 @@ const crypto = require('crypto');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const session = require('express-session');
-const MongoStore = require('connect-mongo');
+const connectMongo = require('connect-mongo');
 const bcrypt = require('bcryptjs');
 const mongoose = require('mongoose');
 const mercadopago = require('mercadopago');
@@ -16,6 +16,7 @@ const Transaction = require('./models/Transaction');
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
 const MONGODB_URI = process.env.MONGODB_URI || process.env.MONGO_URI;
+const MongoStore = connectMongo.default || connectMongo;
 
 const REQUIRED_ENV = ['MERCADO_PAGO_ACCESS_TOKEN', 'SESSION_SECRET', 'MONGODB_URI'];
 
@@ -81,6 +82,20 @@ function serializeTx(tx) {
   };
 }
 
+function createMongoSessionStore() {
+  const options = {
+    mongoUrl: MONGODB_URI,
+    ttl: 60 * 60 * 24 * 30,
+    autoRemove: 'native'
+  };
+
+  if (typeof MongoStore.create === 'function') {
+    return MongoStore.create(options);
+  }
+
+  return new MongoStore(options);
+}
+
 async function refreshPaymentStatus(localPaymentId) {
   const tx = await Transaction.findOne({ localPaymentId });
   if (!tx || !tx.mpPaymentId) {
@@ -131,11 +146,7 @@ app.use(
     resave: false,
     saveUninitialized: false,
     rolling: true,
-    store: MongoStore.create({
-      mongoUrl: MONGODB_URI,
-      ttl: 60 * 60 * 24 * 30,
-      autoRemove: 'native'
-    }),
+    store: createMongoSessionStore(),
     cookie: {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
