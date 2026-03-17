@@ -84,6 +84,10 @@
             background: #fafafa;
         }
         .payment-option input { width: auto; margin-top: 4px; }
+        .card-block { margin-top: 14px; border: 1px solid var(--line); border-radius: 12px; padding: 12px; display: none; }
+        .card-block.active { display: block; }
+        .card-block input, .card-block select { margin-top: 6px; }
+        .alert { background: #fff7ed; color: #9a3412; padding: 10px; border-radius: 10px; margin: 10px 0; display: none; }
         button {
             width: 100%;
             margin-top: 14px;
@@ -99,6 +103,7 @@
             .layout { grid-template-columns: 1fr; }
         }
     </style>
+    <script src="https://sdk.mercadopago.com/js/v2"></script>
 </head>
 <body>
     <main class="container" data-base-price="<%= Number(prices.base).toFixed(2) %>" data-lunch-price="<%= Number(prices.lunch).toFixed(2) %>">
@@ -109,8 +114,15 @@
             <div class="error"><%= error %></div>
         <% } %>
 
-        <form action="/checkout" method="POST" autocomplete="off" class="layout">
+        <form id="checkout-form" action="/checkout" method="POST" autocomplete="off" class="layout">
             <input type="hidden" name="csrfToken" value="<%= csrfToken %>" />
+            <input type="hidden" name="cardToken" id="cardToken" />
+            <input type="hidden" name="cardPaymentMethodId" id="cardPaymentMethodId" />
+            <input type="hidden" name="cardIssuerId" id="cardIssuerId" />
+            <input type="hidden" name="cardInstallments" id="cardInstallments" />
+            <input type="hidden" name="cardIdentificationType" id="cardIdentificationType" />
+            <input type="hidden" name="cardIdentificationNumber" id="cardIdentificationNumberHidden" />
+            <input type="hidden" name="cardEmail" id="cardEmailHidden" />
 
             <section class="card">
                 <h2>Dados do responsável</h2>
@@ -169,9 +181,23 @@
                         <input type="radio" name="paymentMethod" value="card" />
                         <span>
                             <strong>Cartão</strong><br />
-                            <span class="muted">Você informa os dados do cartão na próxima tela, com segurança do Mercado Pago.</span>
+                            <span class="muted">Pagamento com cartão direto aqui, com segurança do Mercado Pago.</span>
                         </span>
                     </label>
+                </div>
+
+                <div id="card-block" class="card-block">
+                    <h3 style="margin:0 0 8px;">Dados do cartão</h3>
+                    <div id="card-error" class="alert"></div>
+                    <div id="form-checkout__cardNumber"></div>
+                    <div id="form-checkout__expirationDate"></div>
+                    <div id="form-checkout__securityCode"></div>
+                    <input type="text" id="form-checkout__cardholderName" placeholder="Nome no cartão" />
+                    <select id="form-checkout__issuer"></select>
+                    <select id="form-checkout__installments"></select>
+                    <select id="form-checkout__identificationType"></select>
+                    <input type="text" id="form-checkout__identificationNumber" placeholder="CPF do titular" />
+                    <input type="email" id="form-checkout__cardholderEmail" placeholder="E-mail do titular" />
                 </div>
 
                 <button type="submit">Gerar PIX</button>
@@ -189,8 +215,14 @@
             const lineWithout = document.getElementById('lineWithout');
             const lineWith = document.getElementById('lineWith');
             const total = document.getElementById('total');
+            const form = document.getElementById('checkout-form');
             const submitButton = document.querySelector('button[type="submit"]');
             const paymentMethodInputs = document.querySelectorAll('input[name="paymentMethod"]');
+            const cardBlock = document.getElementById('card-block');
+            const cardError = document.getElementById('card-error');
+
+            let cardForm = null;
+            let cardFormInitialized = false;
 
             function safeInt(v) {
                 const n = Number(v);
@@ -210,8 +242,72 @@
 
                 const selectedMethod = Array.from(paymentMethodInputs).find((input) => input.checked)?.value || 'pix';
                 if (submitButton) {
-                    submitButton.textContent = selectedMethod === 'card' ? 'Continuar para cartão' : 'Gerar PIX';
+                    submitButton.textContent = selectedMethod === 'card' ? 'Pagar com cartão' : 'Gerar PIX';
                 }
+                if (cardBlock) {
+                    cardBlock.classList.toggle('active', selectedMethod === 'card');
+                }
+                if (selectedMethod === 'card' && !cardFormInitialized) {
+                    initializeCardForm();
+                }
+            }
+
+            function initializeCardForm() {
+                if (typeof MercadoPago === 'undefined' || cardFormInitialized) {
+                    return;
+                }
+                cardFormInitialized = true;
+                const mp = new MercadoPago('<%= publicKey %>', { locale: 'pt-BR' });
+
+                cardForm = mp.cardForm({
+                    amount: total.textContent.replace('R$ ', ''),
+                    iframe: true,
+                    form: {
+                        id: 'checkout-form',
+                        cardNumber: { id: 'form-checkout__cardNumber', placeholder: 'Número do cartão' },
+                        expirationDate: { id: 'form-checkout__expirationDate', placeholder: 'MM/AA' },
+                        securityCode: { id: 'form-checkout__securityCode', placeholder: 'CVV' },
+                        cardholderName: { id: 'form-checkout__cardholderName', placeholder: 'Nome no cartão' },
+                        issuer: { id: 'form-checkout__issuer' },
+                        installments: { id: 'form-checkout__installments' },
+                        identificationType: { id: 'form-checkout__identificationType' },
+                        identificationNumber: { id: 'form-checkout__identificationNumber', placeholder: 'CPF do titular' },
+                        cardholderEmail: { id: 'form-checkout__cardholderEmail', placeholder: 'E-mail do titular' }
+                    },
+                    callbacks: {
+                        onSubmit: function (event) {
+                            const selectedMethod = Array.from(paymentMethodInputs).find((input) => input.checked)?.value || 'pix';
+                            if (selectedMethod !== 'card') {
+                                return;
+                            }
+
+                            event.preventDefault();
+                            if (cardError) {
+                                cardError.style.display = 'none';
+                                cardError.textContent = '';
+                            }
+
+                            const data = cardForm.getCardFormData();
+                            document.getElementById('cardToken').value = data.token || '';
+                            document.getElementById('cardPaymentMethodId').value = data.paymentMethodId || '';
+                            document.getElementById('cardIssuerId').value = data.issuerId || '';
+                            document.getElementById('cardInstallments').value = data.installments || '1';
+                            document.getElementById('cardIdentificationType').value = data.identificationType || 'CPF';
+                            document.getElementById('cardIdentificationNumberHidden').value = data.identificationNumber || '';
+                            document.getElementById('cardEmailHidden').value = data.cardholderEmail || '';
+
+                            if (!data.token) {
+                                if (cardError) {
+                                    cardError.textContent = 'Não foi possível gerar o token do cartão.';
+                                    cardError.style.display = 'block';
+                                }
+                                return;
+                            }
+
+                            form.submit();
+                        }
+                    }
+                });
             }
 
             qtyWithout.addEventListener('input', render);

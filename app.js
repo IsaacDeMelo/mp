@@ -208,9 +208,9 @@ app.use(
       useDefaults: true,
       directives: {
         'script-src': ["'self'", "'unsafe-inline'", 'https://sdk.mercadopago.com'],
-        'img-src': ["'self'", 'data:', 'https://http2.mlstatic.com'],
-        'frame-src': ["'self'", 'https://www.mercadopago.com', 'https://sdk.mercadopago.com'],
-        'connect-src': ["'self'", 'https://api.mercadopago.com', 'https://sdk.mercadopago.com']
+        'img-src': ["'self'", 'data:', 'https://http2.mlstatic.com', 'https://www.mercadolibre.com'],
+        'frame-src': ["'self'", 'https://www.mercadopago.com', 'https://sdk.mercadopago.com', 'https://www.mercadolibre.com'],
+        'connect-src': ["'self'", 'https://api.mercadopago.com', 'https://sdk.mercadopago.com', 'https://api.mercadolibre.com', 'https://www.mercadolibre.com']
       }
     }
   })
@@ -274,6 +274,13 @@ app.post('/checkout', requireCsrf, async (req, res) => {
   const quantityWithLunch = parseQty(req.body.quantityWithLunch);
   const totalTickets = quantityWithoutLunch + quantityWithLunch;
   const paymentMethod = String(req.body.paymentMethod || 'pix').trim().toLowerCase() === 'card' ? 'card' : 'pix';
+  const cardToken = String(req.body.cardToken || '').trim();
+  const cardPaymentMethodId = String(req.body.cardPaymentMethodId || '').trim();
+  const cardIssuerId = String(req.body.cardIssuerId || '').trim();
+  const cardInstallments = Number(req.body.cardInstallments || 1);
+  const cardIdentificationType = String(req.body.cardIdentificationType || 'CPF').trim();
+  const cardIdentificationNumber = String(req.body.cardIdentificationNumber || '').trim();
+  const cardEmail = String(req.body.cardEmail || buyerEmail).trim().toLowerCase();
   const caravanCouponInput = String(req.body.caravanCouponCode || '').trim().toLowerCase();
   const leaderCouponInput = String(req.body.leaderCouponCode || '').trim().toLowerCase();
 
@@ -344,6 +351,40 @@ app.post('/checkout', requireCsrf, async (req, res) => {
     const webhookUrl = buildWebhookUrl();
 
     if (paymentMethod === 'card') {
+      if (!cardToken || !cardPaymentMethodId || !cardIdentificationNumber || !cardEmail) {
+        return res.status(400).render('index', {
+          error: 'Dados do cartão incompletos. Preencha o formulário de cartão.',
+          message: null,
+          prices: { base: BASE_TICKET_PRICE, lunch: LUNCH_ADDON_PRICE },
+          publicKey: process.env.MERCADO_PAGO_PUBLIC_KEY
+        });
+      }
+
+      const cardPaymentData = {
+        transaction_amount: amounts.total,
+        token: cardToken,
+        description: `Ingressos: ${totalTickets} (${quantityWithLunch} c/ almoço)`,
+        installments: Number.isFinite(cardInstallments) && cardInstallments > 0 ? cardInstallments : 1,
+        payment_method_id: cardPaymentMethodId,
+        external_reference: localPaymentId,
+        payer: {
+          email: cardEmail,
+          identification: {
+            type: cardIdentificationType || 'CPF',
+            number: cardIdentificationNumber
+          }
+        }
+      };
+
+      if (cardIssuerId) {
+        cardPaymentData.issuer_id = cardIssuerId;
+      }
+      if (webhookUrl) {
+        cardPaymentData.notification_url = webhookUrl;
+      }
+
+      const cardPayment = await mercadopago.payment.create(cardPaymentData);
+
       await Transaction.create({
         localPaymentId,
         buyerName,
@@ -364,10 +405,14 @@ app.post('/checkout', requireCsrf, async (req, res) => {
         leaderCouponCode: leaderCoupon?.code || null,
         couponCode: caravanCoupon?.code || leaderCoupon?.code || null,
         amount: amounts.total,
-        status: 'awaiting_card',
-        statusDetail: 'awaiting_card_submission',
+        status: mapMpStatus(cardPayment.body?.status),
+        statusDetail: cardPayment.body?.status_detail || null,
+        mpPaymentId: cardPayment.body?.id ? String(cardPayment.body.id) : null,
+        installments: cardPayment.body?.installments || cardPaymentData.installments,
+        cardFirstSixDigits: cardPayment.body?.card?.first_six_digits || null,
+        cardLastFourDigits: cardPayment.body?.card?.last_four_digits || null,
         externalReference: localPaymentId,
-        lastCheckedAt: null
+        lastCheckedAt: new Date()
       });
 
       if (caravanCoupon) {
