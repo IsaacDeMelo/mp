@@ -5,105 +5,233 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Admin - Inscrições</title>
   <style>
-    body { font-family: Arial, sans-serif; max-width: 1100px; margin: 24px auto; padding: 0 16px; }
-    .top { display: flex; justify-content: space-between; align-items: center; }
-    .card { border: 1px solid #ddd; border-radius: 10px; padding: 16px; margin-bottom: 16px; }
-    input, button { padding: 10px; margin: 6px 0; box-sizing: border-box; }
-    .error { background: #ffe5e5; color: #8f1111; padding: 10px; border-radius: 8px; margin-bottom: 12px; }
-    table { width: 100%; border-collapse: collapse; }
-    th, td { border-bottom: 1px solid #eee; padding: 8px; text-align: left; font-size: 13px; }
+    :root {
+      --bg: #f4f7fb;
+      --card: #ffffff;
+      --line: #e5e7eb;
+      --text: #0f172a;
+      --muted: #64748b;
+      --accent: #2563eb;
+      --success: #16a34a;
+      --warning: #d97706;
+      --danger: #dc2626;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: Inter, Arial, sans-serif; background: var(--bg); color: var(--text); }
+    .container { max-width: 1280px; margin: 0 auto; padding: 24px 16px 40px; }
+    .hero {
+      display: flex; justify-content: space-between; align-items: center; gap: 16px;
+      margin-bottom: 18px; padding: 22px; border-radius: 20px;
+      background: linear-gradient(135deg, #0f172a, #1d4ed8); color: #fff;
+      box-shadow: 0 20px 50px rgba(37, 99, 235, 0.18);
+    }
+    .hero h1 { margin: 0 0 8px; }
+    .hero p { margin: 0; color: rgba(255,255,255,0.82); }
+    .hero button {
+      border: 0; border-radius: 12px; padding: 12px 16px; cursor: pointer;
+      background: rgba(255,255,255,0.14); color: #fff; font-weight: 700;
+    }
+    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 18px; }
+    .stat-card, .panel { background: var(--card); border: 1px solid var(--line); border-radius: 18px; }
+    .stat-card { padding: 18px; }
+    .stat-label { color: var(--muted); font-size: 13px; margin-bottom: 8px; }
+    .stat-value { font-size: 28px; font-weight: 800; }
+    .panels { display: grid; grid-template-columns: 360px 1fr; gap: 18px; align-items: start; }
+    .panel { padding: 18px; overflow: hidden; }
+    h2 { margin: 0 0 14px; font-size: 18px; }
+    .error {
+      background: #fee2e2; color: #991b1b; border: 1px solid #fecaca;
+      padding: 10px 12px; border-radius: 12px; margin-bottom: 12px;
+    }
+    .field { margin-bottom: 12px; }
+    .field label { display: block; margin-bottom: 6px; font-size: 14px; }
+    .field input, .field select {
+      width: 100%; padding: 11px 12px; border: 1px solid var(--line); border-radius: 12px;
+      background: #fff; font-size: 14px;
+    }
+    .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .help { margin-top: 8px; color: var(--muted); font-size: 12px; line-height: 1.45; }
+    .primary-btn {
+      width: 100%; border: 0; border-radius: 12px; padding: 12px 14px;
+      background: linear-gradient(135deg, #2563eb, #1d4ed8); color: #fff; font-weight: 700; cursor: pointer;
+    }
+    .table-wrap { overflow: auto; border: 1px solid var(--line); border-radius: 14px; }
+    table { width: 100%; border-collapse: collapse; min-width: 820px; }
+    th, td { border-bottom: 1px solid var(--line); padding: 10px 12px; text-align: left; font-size: 13px; vertical-align: top; }
+    th { background: #f8fafc; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+    .badge {
+      display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 5px 10px;
+      font-size: 12px; font-weight: 700;
+    }
+    .badge-caravana { background: #dbeafe; color: #1d4ed8; }
+    .badge-lider { background: #ede9fe; color: #6d28d9; }
+    .badge-individual { background: #e2e8f0; color: #334155; }
+    .badge-approved { background: #dcfce7; color: #166534; }
+    .badge-pending { background: #fef3c7; color: #92400e; }
+    .badge-awaiting_card { background: #e0f2fe; color: #075985; }
+    .badge-default { background: #f1f5f9; color: #334155; }
     .mono { font-family: Consolas, monospace; font-size: 12px; }
+    .coupon-stack { display: grid; gap: 8px; }
+    .coupon-item {
+      border: 1px solid var(--line); border-radius: 12px; padding: 12px; background: #fbfdff;
+    }
+    .coupon-top { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+    .coupon-code { font-weight: 800; }
+    .coupon-meta { color: var(--muted); font-size: 12px; }
+    @media (max-width: 1100px) {
+      .stats { grid-template-columns: repeat(2, 1fr); }
+      .panels { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 680px) {
+      .stats { grid-template-columns: 1fr; }
+      .hero { flex-direction: column; align-items: flex-start; }
+      .field-row { grid-template-columns: 1fr; }
+    }
   </style>
 </head>
 <body>
-  <div class="top">
-    <h1>Painel administrativo</h1>
-    <form action="/admin/<%= adminPath %>/logout" method="POST">
-      <input type="hidden" name="csrfToken" value="<%= csrfToken %>" />
-      <button type="submit">Sair</button>
-    </form>
-  </div>
-
-  <% if (error) { %>
-    <div class="error"><%= error %></div>
-  <% } %>
-
-  <section class="card">
-    <h2>Criar cupom de caravana</h2>
-    <form action="/admin/<%= adminPath %>/coupons" method="POST">
-      <input type="hidden" name="csrfToken" value="<%= csrfToken %>" />
+  <main class="container">
+    <section class="hero">
       <div>
-        <label>Código (string única)</label><br />
-        <input type="text" name="code" placeholder="caravana_rionovo" required />
+        <h1>Painel administrativo</h1>
+        <p>Gerencie cupons, acompanhe inscrições e veja rapidamente o status das vendas.</p>
       </div>
-      <div>
-        <label>Desconto em R$</label><br />
-        <input type="number" name="discountAmount" min="0.01" step="0.01" required />
-      </div>
-      <button type="submit">Criar cupom</button>
-    </form>
-  </section>
+      <form action="/admin/<%= adminPath %>/logout" method="POST">
+        <input type="hidden" name="csrfToken" value="<%= csrfToken %>" />
+        <button type="submit">Sair</button>
+      </form>
+    </section>
 
-  <section class="card">
-    <h2>Cupons</h2>
-    <table>
-      <thead>
-        <tr>
-          <th>Código</th>
-          <th>Desconto</th>
-          <th>Status</th>
-          <th>Usado em</th>
-        </tr>
-      </thead>
-      <tbody>
-        <% coupons.forEach(function(c) { %>
-          <tr>
-            <td><%= c.code %></td>
-            <td>R$ <%= Number(c.discountAmount).toFixed(2) %></td>
-            <td><%= c.isUsed ? 'utilizado' : 'disponível' %></td>
-            <td class="mono"><%= c.usedByPaymentId || '-' %></td>
-          </tr>
-        <% }) %>
-      </tbody>
-    </table>
-  </section>
+    <% if (error) { %>
+      <div class="error"><%= error %></div>
+    <% } %>
 
-  <section class="card">
-    <h2>Todas as inscrições</h2>
-    <table>
-      <thead>
-        <tr>
-          <th>Data</th>
-          <th>Nome</th>
-          <th>E-mail</th>
-          <th>Telefone</th>
-          <th>Qtd sem almoço</th>
-          <th>Qtd com almoço</th>
-          <th>Subtotal</th>
-          <th>Desconto</th>
-          <th>Total</th>
-          <th>Status</th>
-          <th>Cupom</th>
-        </tr>
-      </thead>
-      <tbody>
-        <% transactions.forEach(function(t) { %>
-          <tr>
-            <td><%= t.createdAt %></td>
-            <td><%= t.buyerName %></td>
-            <td><%= t.buyerEmail %></td>
-            <td><%= t.buyerPhone || '-' %></td>
-            <td><%= t.quantityWithoutLunch %></td>
-            <td><%= t.quantityWithLunch %></td>
-            <td>R$ <%= Number(t.subtotalAmount || 0).toFixed(2) %></td>
-            <td>R$ <%= Number(t.discountAmount || 0).toFixed(2) %></td>
-            <td>R$ <%= Number(t.amount).toFixed(2) %></td>
-            <td><%= t.status %></td>
-            <td><%= t.couponCode || '-' %></td>
-          </tr>
-        <% }) %>
-      </tbody>
-    </table>
-  </section>
+    <section class="stats">
+      <article class="stat-card">
+        <div class="stat-label">Pedidos totais</div>
+        <div class="stat-value"><%= stats.totalOrders %></div>
+      </article>
+      <article class="stat-card">
+        <div class="stat-label">Pagamentos aprovados</div>
+        <div class="stat-value"><%= stats.approvedOrders %></div>
+      </article>
+      <article class="stat-card">
+        <div class="stat-label">Aguardando ação</div>
+        <div class="stat-value"><%= stats.pendingOrders %></div>
+      </article>
+      <article class="stat-card">
+        <div class="stat-label">Receita aprovada</div>
+        <div class="stat-value">R$ <%= Number(stats.revenue || 0).toFixed(2) %></div>
+      </article>
+    </section>
+
+    <section class="panels">
+      <aside class="panel">
+        <h2>Novo cupom</h2>
+        <form action="/admin/<%= adminPath %>/coupons" method="POST">
+          <input type="hidden" name="csrfToken" value="<%= csrfToken %>" />
+
+          <div class="field">
+            <label>Tipo do cupom</label>
+            <select name="couponType" required>
+              <option value="caravana">Caravana</option>
+              <option value="lider">Líder</option>
+            </select>
+          </div>
+
+          <div class="field-row">
+            <div class="field">
+              <label>Código</label>
+              <input type="text" name="code" placeholder="caravana_rionovo" required />
+            </div>
+            <div class="field">
+              <label>Desconto (R$)</label>
+              <input type="number" name="discountAmount" min="0.01" step="0.01" required />
+            </div>
+          </div>
+
+          <div class="help">
+            Cupom de caravana: aplica o desconto normalmente no pedido.<br />
+            Cupom de líder: aplica o desconto apenas em 1 ingresso da compra.<br />
+            É permitido usar 1 cupom de caravana + 1 cupom de líder juntos.
+          </div>
+
+          <button class="primary-btn" type="submit">Criar cupom</button>
+        </form>
+
+        <h2 style="margin-top:22px;">Cupons cadastrados</h2>
+        <div class="coupon-stack">
+          <% coupons.forEach(function(c) { %>
+            <article class="coupon-item">
+              <div class="coupon-top">
+                <div>
+                  <div class="coupon-code"><%= c.code %></div>
+                  <div class="coupon-meta">Criado em <%= c.createdAt %></div>
+                </div>
+                <span class="badge <%= c.couponType === 'lider' ? 'badge-lider' : 'badge-caravana' %>"><%= c.couponType %></span>
+              </div>
+              <div class="coupon-meta">Desconto: R$ <%= Number(c.discountAmount).toFixed(2) %></div>
+              <div class="coupon-meta">Usos: <%= c.usageCount || 0 %></div>
+              <div class="coupon-meta">Último pedido: <span class="mono"><%= c.lastUsedByPaymentId || '-' %></span></div>
+            </article>
+          <% }) %>
+        </div>
+      </aside>
+
+      <section class="panel">
+        <h2>Inscrições</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>Tipo</th>
+                <th>Comprador</th>
+                <th>Contato</th>
+                <th>Ingressos</th>
+                <th>Resumo financeiro</th>
+                <th>Status</th>
+                <th>Cupons</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% transactions.forEach(function(t) { %>
+                <tr>
+                  <td><%= t.createdAt %></td>
+                  <td>
+                    <span class="badge <%= (t.purchaseType || 'individual') === 'caravana' ? 'badge-caravana' : 'badge-individual' %>">
+                      <%= t.purchaseType || 'individual' %>
+                    </span>
+                  </td>
+                  <td>
+                    <strong><%= t.buyerName %></strong><br />
+                    <span class="mono"><%= t.buyerEmail %></span>
+                  </td>
+                  <td><%= t.buyerPhone || '-' %></td>
+                  <td>
+                    Total: <strong><%= t.totalTickets || ((t.quantityWithoutLunch || 0) + (t.quantityWithLunch || 0)) %></strong><br />
+                    Sem almoço: <%= t.quantityWithoutLunch %><br />
+                    Com almoço: <%= t.quantityWithLunch %>
+                  </td>
+                  <td>
+                    Subtotal: R$ <%= Number(t.subtotalAmount || 0).toFixed(2) %><br />
+                    Desconto: R$ <%= Number(t.discountAmount || 0).toFixed(2) %><br />
+                    <strong>Total: R$ <%= Number(t.amount || 0).toFixed(2) %></strong>
+                  </td>
+                  <td>
+                    <span class="badge badge-<%= ['approved','pending','awaiting_card'].includes(t.status) ? t.status : 'default' %>"><%= t.status %></span>
+                  </td>
+                  <td>
+                    Caravana: <%= t.caravanCouponCode || '-' %><br />
+                    Líder: <%= t.leaderCouponCode || '-' %>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+  </main>
 </body>
 </html>

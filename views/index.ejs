@@ -5,52 +5,220 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Inscrição e pagamento PIX</title>
     <style>
-        body { font-family: Arial, sans-serif; max-width: 760px; margin: 24px auto; padding: 0 16px; }
-        .card { border: 1px solid #ddd; border-radius: 10px; padding: 16px; }
-        input, button { width: 100%; padding: 10px; margin: 6px 0; box-sizing: border-box; }
-        button { cursor: pointer; }
-        .error { background: #ffe5e5; color: #8f1111; padding: 10px; border-radius: 8px; margin-bottom: 12px; }
-        .small { font-size: 13px; color: #555; }
+        :root {
+            --bg: #f6f7fb;
+            --card: #ffffff;
+            --text: #222;
+            --muted: #6b7280;
+            --line: #e5e7eb;
+            --primary: #2563eb;
+            --danger-bg: #ffe5e5;
+            --danger-text: #8f1111;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: Inter, Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+        }
+        .container {
+            max-width: 1000px;
+            margin: 28px auto;
+            padding: 0 16px;
+        }
+        .title { margin: 0 0 6px; }
+        .subtitle { margin: 0 0 18px; color: var(--muted); }
+        .layout {
+            display: grid;
+            grid-template-columns: 1.3fr 0.9fr;
+            gap: 18px;
+            align-items: start;
+        }
+        .card {
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            padding: 18px;
+        }
+        .error {
+            background: var(--danger-bg);
+            color: var(--danger-text);
+            border-radius: 10px;
+            padding: 10px;
+            margin-bottom: 12px;
+        }
+        h2 { margin-top: 0; font-size: 18px; }
+        label { display: block; margin: 10px 0 4px; font-size: 14px; }
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--line);
+            border-radius: 10px;
+        }
         .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .muted { color: var(--muted); font-size: 13px; }
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 8px 0;
+            font-size: 14px;
+        }
+        .summary-total {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px dashed var(--line);
+            font-weight: 700;
+            font-size: 17px;
+            display: flex;
+            justify-content: space-between;
+        }
+        .payment-options { display: grid; gap: 10px; margin-top: 14px; }
+        .payment-option {
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            padding: 12px;
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+            background: #fafafa;
+        }
+        .payment-option input { width: auto; margin-top: 4px; }
+        button {
+            width: 100%;
+            margin-top: 14px;
+            border: 0;
+            border-radius: 10px;
+            padding: 12px;
+            background: var(--primary);
+            color: #fff;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        @media (max-width: 840px) {
+            .layout { grid-template-columns: 1fr; }
+        }
     </style>
 </head>
 <body>
-    <h1>Inscrição sem login</h1>
-    <p class="small">Ingresso: R$ <%= Number(prices.base).toFixed(2) %> | Almoço adicional por ingresso: R$ <%= Number(prices.lunch).toFixed(2) %></p>
+    <main class="container" data-base-price="<%= Number(prices.base).toFixed(2) %>" data-lunch-price="<%= Number(prices.lunch).toFixed(2) %>">
+        <h1 class="title">Finalizar inscrição</h1>
+        <p class="subtitle">Escolha as quantidades como em um carrinho e gere o PIX em um clique.</p>
 
-    <% if (error) { %>
-        <div class="error"><%= error %></div>
-    <% } %>
+        <% if (error) { %>
+            <div class="error"><%= error %></div>
+        <% } %>
 
-    <section class="card">
-        <form action="/checkout" method="POST" autocomplete="off">
+        <form action="/checkout" method="POST" autocomplete="off" class="layout">
             <input type="hidden" name="csrfToken" value="<%= csrfToken %>" />
 
-            <label>Nome completo</label>
-            <input type="text" name="buyerName" required maxlength="120" />
+            <section class="card">
+                <h2>Dados do responsável</h2>
+                <label>Nome completo</label>
+                <input type="text" name="buyerName" required maxlength="120" />
 
-            <label>E-mail</label>
-            <input type="email" name="buyerEmail" required />
+                <label>E-mail</label>
+                <input type="email" name="buyerEmail" required />
 
-            <label>Telefone (opcional)</label>
-            <input type="tel" name="buyerPhone" maxlength="30" />
+                <label>Telefone (opcional)</label>
+                <input type="tel" name="buyerPhone" maxlength="30" />
 
-            <div class="grid2">
-                <div>
-                    <label>Qtd. ingressos sem almoço</label>
-                    <input type="number" name="quantityWithoutLunch" min="0" step="1" value="1" required />
+                <h2 style="margin-top:16px;">Seu carrinho</h2>
+                <div class="grid2">
+                    <div>
+                        <label>Ingressos sem almoço</label>
+                        <input id="qtyWithout" type="number" name="quantityWithoutLunch" min="0" step="1" value="1" required />
+                        <div class="muted">R$ <%= Number(prices.base).toFixed(2) %> por ingresso</div>
+                    </div>
+                    <div>
+                        <label>Ingressos com almoço</label>
+                        <input id="qtyWith" type="number" name="quantityWithLunch" min="0" step="1" value="0" required />
+                        <div class="muted">R$ <%= Number(prices.base + prices.lunch).toFixed(2) %> por ingresso</div>
+                    </div>
                 </div>
-                <div>
-                    <label>Qtd. ingressos com almoço</label>
-                    <input type="number" name="quantityWithLunch" min="0" step="1" value="0" required />
+
+                <div class="grid2" style="margin-top:10px;">
+                    <div>
+                        <label>Cupom de caravana (opcional)</label>
+                        <input type="text" name="caravanCouponCode" placeholder="ex: caravana_rionovo" />
+                    </div>
+                    <div>
+                        <label>Cupom de líder (opcional)</label>
+                        <input type="text" name="leaderCouponCode" placeholder="ex: lider_rionovo" />
+                    </div>
                 </div>
-            </div>
+                <div class="muted">Você pode usar 1 cupom de caravana e 1 cupom de líder na mesma compra.</div>
+            </section>
 
-            <label>Cupom (opcional)</label>
-            <input type="text" name="couponCode" placeholder="ex: caravana_rionovo" />
+            <aside class="card">
+                <h2>Resumo do pedido</h2>
+                <div class="summary-row"><span>Sem almoço</span><strong id="lineWithout">R$ 1.00</strong></div>
+                <div class="summary-row"><span>Com almoço</span><strong id="lineWith">R$ 0.00</strong></div>
+                <div class="summary-total"><span>Total estimado</span><span id="total">R$ 1.00</span></div>
+                <p class="muted">O desconto é calculado no backend. Cupom de líder vale só para 1 ingresso da compra.</p>
 
-            <button type="submit">Gerar PIX</button>
+                <div class="payment-options">
+                    <label class="payment-option">
+                        <input type="radio" name="paymentMethod" value="pix" checked />
+                        <span>
+                            <strong>PIX</strong><br />
+                            <span class="muted">Gera QR Code e chave copia-e-cola na hora.</span>
+                        </span>
+                    </label>
+                    <label class="payment-option">
+                        <input type="radio" name="paymentMethod" value="card" />
+                        <span>
+                            <strong>Cartão</strong><br />
+                            <span class="muted">Você informa os dados do cartão na próxima tela, com segurança do Mercado Pago.</span>
+                        </span>
+                    </label>
+                </div>
+
+                <button type="submit">Gerar PIX</button>
+            </aside>
         </form>
-    </section>
+    </main>
+
+    <script>
+        (function () {
+            const container = document.querySelector('.container');
+            const base = Number(container?.dataset.basePrice || '0');
+            const lunch = Number(container?.dataset.lunchPrice || '0');
+            const qtyWithout = document.getElementById('qtyWithout');
+            const qtyWith = document.getElementById('qtyWith');
+            const lineWithout = document.getElementById('lineWithout');
+            const lineWith = document.getElementById('lineWith');
+            const total = document.getElementById('total');
+            const submitButton = document.querySelector('button[type="submit"]');
+            const paymentMethodInputs = document.querySelectorAll('input[name="paymentMethod"]');
+
+            function safeInt(v) {
+                const n = Number(v);
+                return Number.isInteger(n) && n > 0 ? n : 0;
+            }
+
+            function render() {
+                const qWithout = safeInt(qtyWithout.value);
+                const qWith = safeInt(qtyWith.value);
+                const valueWithout = qWithout * base;
+                const valueWith = qWith * (base + lunch);
+                const grandTotal = valueWithout + valueWith;
+
+                lineWithout.textContent = `R$ ${valueWithout.toFixed(2)}`;
+                lineWith.textContent = `R$ ${valueWith.toFixed(2)}`;
+                total.textContent = `R$ ${grandTotal.toFixed(2)}`;
+
+                const selectedMethod = Array.from(paymentMethodInputs).find((input) => input.checked)?.value || 'pix';
+                if (submitButton) {
+                    submitButton.textContent = selectedMethod === 'card' ? 'Continuar para cartão' : 'Gerar PIX';
+                }
+            }
+
+            qtyWithout.addEventListener('input', render);
+            qtyWith.addEventListener('input', render);
+            paymentMethodInputs.forEach((input) => input.addEventListener('change', render));
+            render();
+        })();
+    </script>
 </body>
 </html>

@@ -15,16 +15,27 @@ const CouponSchema = new mongoose.Schema(
       required: true,
       min: 0.01
     },
-    isUsed: {
-      type: Boolean,
-      default: false,
+    couponType: {
+      type: String,
+      required: true,
+      enum: ['caravana', 'lider'],
+      default: 'caravana',
       index: true
     },
-    usedAt: {
+    isActive: {
+      type: Boolean,
+      default: true,
+      index: true
+    },
+    usageCount: {
+      type: Number,
+      default: 0
+    },
+    lastUsedAt: {
       type: Date,
       default: null
     },
-    usedByPaymentId: {
+    lastUsedByPaymentId: {
       type: String,
       default: null
     },

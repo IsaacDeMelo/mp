@@ -27,6 +27,9 @@ const missingEnv = REQUIRED_ENV.filter((k) => !process.env[k]);
 if (!MONGODB_URI) {
   missingEnv.push('MONGODB_URI');
 }
+if (!process.env.MERCADO_PAGO_PUBLIC_KEY) {
+  missingEnv.push('MERCADO_PAGO_PUBLIC_KEY');
+}
 
 if (missingEnv.length > 0) {
   console.error('Variáveis de ambiente faltando:', missingEnv.join(', '));
@@ -84,20 +87,43 @@ function parseQty(value) {
   return n;
 }
 
-function calcAmounts(quantityWithoutLunch, quantityWithLunch, discountValue) {
+function calcAmounts(quantityWithoutLunch, quantityWithLunch, caravanDiscountValue, leaderDiscountValue) {
   const subtotal =
     quantityWithoutLunch * BASE_TICKET_PRICE +
     quantityWithLunch * (BASE_TICKET_PRICE + LUNCH_ADDON_PRICE);
 
   const maxDiscount = Math.max(0, subtotal - 0.01);
-  const discountAmount = Math.min(Math.max(discountValue || 0, 0), maxDiscount);
+  const singleTicketCap = quantityWithLunch > 0
+    ? BASE_TICKET_PRICE + LUNCH_ADDON_PRICE
+    : quantityWithoutLunch > 0
+      ? BASE_TICKET_PRICE
+      : 0;
+
+  const caravanDiscountAmount = Math.max(caravanDiscountValue || 0, 0);
+  const leaderDiscountAmount = Math.min(Math.max(leaderDiscountValue || 0, 0), singleTicketCap);
+  const discountAmount = Math.min(caravanDiscountAmount + leaderDiscountAmount, maxDiscount);
+
+  let adjustedCaravanDiscount = caravanDiscountAmount;
+  let adjustedLeaderDiscount = leaderDiscountAmount;
+
+  if (discountAmount < caravanDiscountAmount + leaderDiscountAmount) {
+    const overflow = caravanDiscountAmount + leaderDiscountAmount - discountAmount;
+    adjustedLeaderDiscount = Math.max(0, leaderDiscountAmount - overflow);
+  }
+
   const total = Number((subtotal - discountAmount).toFixed(2));
 
   return {
     subtotal: Number(subtotal.toFixed(2)),
+    caravanDiscountAmount: Number(adjustedCaravanDiscount.toFixed(2)),
+    leaderDiscountAmount: Number(adjustedLeaderDiscount.toFixed(2)),
     discountAmount: Number(discountAmount.toFixed(2)),
     total
   };
+}
+
+function couponBadgeType(caravanCoupon) {
+  return caravanCoupon ? 'caravana' : 'individual';
 }
 
 async function refreshPaymentStatus(localPaymentId) {
@@ -181,8 +207,10 @@ app.use(
     contentSecurityPolicy: {
       useDefaults: true,
       directives: {
-        'script-src': ["'self'", "'unsafe-inline'"],
-        'img-src': ["'self'", 'data:']
+        'script-src': ["'self'", "'unsafe-inline'", 'https://sdk.mercadopago.com'],
+        'img-src': ["'self'", 'data:', 'https://http2.mlstatic.com'],
+        'frame-src': ["'self'", 'https://www.mercadopago.com', 'https://sdk.mercadopago.com'],
+        'connect-src': ["'self'", 'https://api.mercadopago.com', 'https://sdk.mercadopago.com']
       }
     }
   })
@@ -233,7 +261,8 @@ app.get('/', (req, res) => {
     prices: {
       base: BASE_TICKET_PRICE,
       lunch: LUNCH_ADDON_PRICE
-    }
+    },
+    publicKey: process.env.MERCADO_PAGO_PUBLIC_KEY
   });
 });
 
@@ -243,46 +272,125 @@ app.post('/checkout', requireCsrf, async (req, res) => {
   const buyerPhone = String(req.body.buyerPhone || '').trim();
   const quantityWithoutLunch = parseQty(req.body.quantityWithoutLunch);
   const quantityWithLunch = parseQty(req.body.quantityWithLunch);
-  const couponInput = String(req.body.couponCode || '').trim().toLowerCase();
+  const totalTickets = quantityWithoutLunch + quantityWithLunch;
+  const paymentMethod = String(req.body.paymentMethod || 'pix').trim().toLowerCase() === 'card' ? 'card' : 'pix';
+  const caravanCouponInput = String(req.body.caravanCouponCode || '').trim().toLowerCase();
+  const leaderCouponInput = String(req.body.leaderCouponCode || '').trim().toLowerCase();
 
   if (!buyerName || !buyerEmail) {
     return res.status(400).render('index', {
       error: 'Informe nome e e-mail para a inscrição.',
       message: null,
-      prices: { base: BASE_TICKET_PRICE, lunch: LUNCH_ADDON_PRICE }
+      prices: { base: BASE_TICKET_PRICE, lunch: LUNCH_ADDON_PRICE },
+      publicKey: process.env.MERCADO_PAGO_PUBLIC_KEY
     });
   }
 
-  if (quantityWithoutLunch + quantityWithLunch <= 0) {
+  if (totalTickets <= 0) {
     return res.status(400).render('index', {
       error: 'Informe ao menos 1 ingresso.',
       message: null,
-      prices: { base: BASE_TICKET_PRICE, lunch: LUNCH_ADDON_PRICE }
+      prices: { base: BASE_TICKET_PRICE, lunch: LUNCH_ADDON_PRICE },
+      publicKey: process.env.MERCADO_PAGO_PUBLIC_KEY
     });
   }
 
-  let coupon = null;
-  if (couponInput) {
-    coupon = await Coupon.findOne({ code: couponInput, isUsed: false });
-    if (!coupon) {
+  let caravanCoupon = null;
+  let leaderCoupon = null;
+
+  if (caravanCouponInput) {
+    caravanCoupon = await Coupon.findOne({
+      code: caravanCouponInput,
+      couponType: 'caravana',
+      isActive: true
+    });
+
+    if (!caravanCoupon) {
       return res.status(400).render('index', {
-        error: 'Cupom inválido ou já utilizado.',
+        error: 'Cupom de caravana inválido.',
         message: null,
-        prices: { base: BASE_TICKET_PRICE, lunch: LUNCH_ADDON_PRICE }
+        prices: { base: BASE_TICKET_PRICE, lunch: LUNCH_ADDON_PRICE },
+        publicKey: process.env.MERCADO_PAGO_PUBLIC_KEY
       });
     }
   }
 
-  const amounts = calcAmounts(quantityWithoutLunch, quantityWithLunch, coupon?.discountAmount || 0);
+  if (leaderCouponInput) {
+    leaderCoupon = await Coupon.findOne({
+      code: leaderCouponInput,
+      couponType: 'lider',
+      isActive: true
+    });
+
+    if (!leaderCoupon) {
+      return res.status(400).render('index', {
+        error: 'Cupom de líder inválido.',
+        message: null,
+        prices: { base: BASE_TICKET_PRICE, lunch: LUNCH_ADDON_PRICE },
+        publicKey: process.env.MERCADO_PAGO_PUBLIC_KEY
+      });
+    }
+  }
+
+  const amounts = calcAmounts(
+    quantityWithoutLunch,
+    quantityWithLunch,
+    caravanCoupon?.discountAmount || 0,
+    leaderCoupon?.discountAmount || 0
+  );
   const localPaymentId = crypto.randomUUID();
 
   try {
     const webhookUrl = buildWebhookUrl();
 
+    if (paymentMethod === 'card') {
+      await Transaction.create({
+        localPaymentId,
+        buyerName,
+        buyerEmail,
+        buyerPhone,
+        paymentMethod,
+        purchaseType: couponBadgeType(caravanCoupon),
+        quantityWithoutLunch,
+        quantityWithLunch,
+        totalTickets,
+        baseTicketPrice: BASE_TICKET_PRICE,
+        lunchAddonPrice: LUNCH_ADDON_PRICE,
+        subtotalAmount: amounts.subtotal,
+        caravanDiscountAmount: amounts.caravanDiscountAmount,
+        leaderDiscountAmount: amounts.leaderDiscountAmount,
+        discountAmount: amounts.discountAmount,
+        caravanCouponCode: caravanCoupon?.code || null,
+        leaderCouponCode: leaderCoupon?.code || null,
+        couponCode: caravanCoupon?.code || leaderCoupon?.code || null,
+        amount: amounts.total,
+        status: 'awaiting_card',
+        statusDetail: 'awaiting_card_submission',
+        externalReference: localPaymentId,
+        lastCheckedAt: null
+      });
+
+      if (caravanCoupon) {
+        caravanCoupon.usageCount += 1;
+        caravanCoupon.lastUsedAt = new Date();
+        caravanCoupon.lastUsedByPaymentId = localPaymentId;
+        await caravanCoupon.save();
+      }
+
+      if (leaderCoupon) {
+        leaderCoupon.usageCount += 1;
+        leaderCoupon.lastUsedAt = new Date();
+        leaderCoupon.lastUsedByPaymentId = localPaymentId;
+        await leaderCoupon.save();
+      }
+
+      return res.redirect(`/payment/${localPaymentId}`);
+    }
+
     const paymentData = {
       transaction_amount: amounts.total,
       payment_method_id: 'pix',
-      description: `Ingressos: ${quantityWithoutLunch + quantityWithLunch} (${quantityWithLunch} c/ almoço)`,
+      description: `Ingressos: ${totalTickets} (${quantityWithLunch} c/ almoço)`,
       external_reference: localPaymentId,
       payer: {
         email: buyerEmail,
@@ -302,13 +410,20 @@ app.post('/checkout', requireCsrf, async (req, res) => {
       buyerName,
       buyerEmail,
       buyerPhone,
+      paymentMethod,
+      purchaseType: couponBadgeType(caravanCoupon),
       quantityWithoutLunch,
       quantityWithLunch,
+      totalTickets,
       baseTicketPrice: BASE_TICKET_PRICE,
       lunchAddonPrice: LUNCH_ADDON_PRICE,
       subtotalAmount: amounts.subtotal,
+      caravanDiscountAmount: amounts.caravanDiscountAmount,
+      leaderDiscountAmount: amounts.leaderDiscountAmount,
       discountAmount: amounts.discountAmount,
-      couponCode: coupon?.code || null,
+      caravanCouponCode: caravanCoupon?.code || null,
+      leaderCouponCode: leaderCoupon?.code || null,
+      couponCode: caravanCoupon?.code || leaderCoupon?.code || null,
       amount: amounts.total,
       status: mapMpStatus(payment.body?.status),
       statusDetail: payment.body?.status_detail || null,
@@ -320,11 +435,18 @@ app.post('/checkout', requireCsrf, async (req, res) => {
       lastCheckedAt: null
     });
 
-    if (coupon) {
-      coupon.isUsed = true;
-      coupon.usedAt = new Date();
-      coupon.usedByPaymentId = localPaymentId;
-      await coupon.save();
+    if (caravanCoupon) {
+      caravanCoupon.usageCount += 1;
+      caravanCoupon.lastUsedAt = new Date();
+      caravanCoupon.lastUsedByPaymentId = localPaymentId;
+      await caravanCoupon.save();
+    }
+
+    if (leaderCoupon) {
+      leaderCoupon.usageCount += 1;
+      leaderCoupon.lastUsedAt = new Date();
+      leaderCoupon.lastUsedByPaymentId = localPaymentId;
+      await leaderCoupon.save();
     }
 
     return res.redirect(`/payment/${localPaymentId}`);
@@ -339,8 +461,81 @@ app.post('/checkout', requireCsrf, async (req, res) => {
     return res.status(500).render('index', {
       error: `Falha ao criar cobrança PIX: ${apiMessage}`,
       message: null,
-      prices: { base: BASE_TICKET_PRICE, lunch: LUNCH_ADDON_PRICE }
+      prices: { base: BASE_TICKET_PRICE, lunch: LUNCH_ADDON_PRICE },
+      publicKey: process.env.MERCADO_PAGO_PUBLIC_KEY
     });
+  }
+});
+
+app.post('/payments/:localPaymentId/card', async (req, res) => {
+  const token = String(req.body.token || '');
+  const paymentMethodId = String(req.body.paymentMethodId || '');
+  const issuerId = req.body.issuerId ? String(req.body.issuerId) : undefined;
+  const installments = Number(req.body.installments || 1);
+  const identificationType = String(req.body.identificationType || 'CPF');
+  const identificationNumber = String(req.body.identificationNumber || '').trim();
+  const email = String(req.body.email || '').trim().toLowerCase();
+
+  if (!token || !paymentMethodId || !email || !identificationNumber) {
+    return res.status(400).json({ error: 'Dados do cartão incompletos.' });
+  }
+
+  const tx = await Transaction.findOne({ localPaymentId: req.params.localPaymentId });
+  if (!tx) {
+    return res.status(404).json({ error: 'Pagamento não encontrado.' });
+  }
+
+  if (tx.paymentMethod !== 'card') {
+    return res.status(400).json({ error: 'Essa inscrição não está configurada para cartão.' });
+  }
+
+  try {
+    const webhookUrl = buildWebhookUrl();
+    const paymentData = {
+      transaction_amount: tx.amount,
+      token,
+      description: `Ingressos: ${tx.totalTickets} (${tx.quantityWithLunch} c/ almoço)`,
+      installments: Number.isFinite(installments) && installments > 0 ? installments : 1,
+      payment_method_id: paymentMethodId,
+      external_reference: tx.localPaymentId,
+      payer: {
+        email,
+        identification: {
+          type: identificationType,
+          number: identificationNumber
+        }
+      }
+    };
+
+    if (issuerId) {
+      paymentData.issuer_id = issuerId;
+    }
+    if (webhookUrl) {
+      paymentData.notification_url = webhookUrl;
+    }
+
+    const payment = await mercadopago.payment.create(paymentData);
+
+    tx.status = mapMpStatus(payment.body?.status);
+    tx.statusDetail = payment.body?.status_detail || null;
+    tx.mpPaymentId = payment.body?.id ? String(payment.body.id) : null;
+    tx.installments = payment.body?.installments || paymentData.installments;
+    tx.cardFirstSixDigits = payment.body?.card?.first_six_digits || null;
+    tx.cardLastFourDigits = payment.body?.card?.last_four_digits || null;
+    tx.lastCheckedAt = new Date();
+    await tx.save();
+
+    return res.json({
+      ok: true,
+      status: tx.status,
+      redirectTo: `/payment/${tx.localPaymentId}`
+    });
+  } catch (error) {
+    const apiMessage =
+      error?.cause?.[0]?.description ||
+      error?.message ||
+      'Falha ao processar cartão.';
+    return res.status(400).json({ error: apiMessage });
   }
 });
 
@@ -366,7 +561,8 @@ app.get('/payment/:localPaymentId', async (req, res) => {
     prices: {
       base: BASE_TICKET_PRICE,
       lunch: LUNCH_ADDON_PRICE
-    }
+    },
+    publicKey: process.env.MERCADO_PAGO_PUBLIC_KEY
   });
 });
 
@@ -468,10 +664,20 @@ app.get('/admin/:slug/dashboard', requireAdminSlug, requireAdminAuth, async (req
   const transactions = await Transaction.find({}).sort({ createdAt: -1 }).lean();
   const coupons = await Coupon.find({}).sort({ createdAt: -1 }).lean();
 
+  const stats = {
+    totalOrders: transactions.length,
+    approvedOrders: transactions.filter((item) => item.status === 'approved').length,
+    pendingOrders: transactions.filter((item) => item.status === 'pending' || item.status === 'awaiting_card').length,
+    revenue: transactions
+      .filter((item) => item.status === 'approved')
+      .reduce((sum, item) => sum + Number(item.amount || 0), 0)
+  };
+
   return res.render('admin-dashboard', {
     adminPath: req.params.slug,
     transactions,
     coupons,
+    stats,
     error: null,
     message: null
   });
@@ -480,15 +686,22 @@ app.get('/admin/:slug/dashboard', requireAdminSlug, requireAdminAuth, async (req
 app.post('/admin/:slug/coupons', requireAdminSlug, requireAdminAuth, requireCsrf, async (req, res) => {
   const code = String(req.body.code || '').trim().toLowerCase();
   const discountAmount = Number(req.body.discountAmount);
+  const couponType = String(req.body.couponType || '').trim().toLowerCase();
 
-  if (!code || !Number.isFinite(discountAmount) || discountAmount <= 0) {
+  if (!code || !['caravana', 'lider'].includes(couponType) || !Number.isFinite(discountAmount) || discountAmount <= 0) {
     const transactions = await Transaction.find({}).sort({ createdAt: -1 }).lean();
     const coupons = await Coupon.find({}).sort({ createdAt: -1 }).lean();
     return res.status(400).render('admin-dashboard', {
       adminPath: req.params.slug,
       transactions,
       coupons,
-      error: 'Cupom inválido. Informe código e desconto maior que 0.',
+      stats: {
+        totalOrders: transactions.length,
+        approvedOrders: transactions.filter((item) => item.status === 'approved').length,
+        pendingOrders: transactions.filter((item) => item.status === 'pending' || item.status === 'awaiting_card').length,
+        revenue: transactions.filter((item) => item.status === 'approved').reduce((sum, item) => sum + Number(item.amount || 0), 0)
+      },
+      error: 'Cupom inválido. Informe tipo, código e desconto maior que 0.',
       message: null
     });
   }
@@ -501,6 +714,12 @@ app.post('/admin/:slug/coupons', requireAdminSlug, requireAdminAuth, requireCsrf
       adminPath: req.params.slug,
       transactions,
       coupons,
+      stats: {
+        totalOrders: transactions.length,
+        approvedOrders: transactions.filter((item) => item.status === 'approved').length,
+        pendingOrders: transactions.filter((item) => item.status === 'pending' || item.status === 'awaiting_card').length,
+        revenue: transactions.filter((item) => item.status === 'approved').reduce((sum, item) => sum + Number(item.amount || 0), 0)
+      },
       error: 'Esse cupom já existe.',
       message: null
     });
@@ -508,6 +727,7 @@ app.post('/admin/:slug/coupons', requireAdminSlug, requireAdminAuth, requireCsrf
 
   await Coupon.create({
     code,
+    couponType,
     discountAmount,
     createdBy: 'admin'
   });

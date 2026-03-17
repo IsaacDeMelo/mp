@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Pagamento PIX</title>
+  <title>Pagamento</title>
   <style>
     body { font-family: Arial, sans-serif; max-width: 760px; margin: 24px auto; padding: 0 16px; }
     .card { border: 1px solid #ddd; border-radius: 10px; padding: 16px; }
@@ -12,19 +12,42 @@
     .status-pending { color: #856404; }
     .status-approved { color: #155724; font-weight: 700; }
     .status-rejected, .status-cancelled { color: #721c24; font-weight: 700; }
+    .copy-row { display: flex; gap: 8px; align-items: stretch; }
+    .copy-row button { border: 0; border-radius: 8px; background: #2563eb; color: #fff; padding: 10px 14px; cursor: pointer; }
+    .copy-feedback { color: #155724; font-size: 12px; margin-top: 6px; display: none; }
+    .card-form input, .card-form select { width: 100%; padding: 10px; margin: 6px 0; box-sizing: border-box; }
+    .card-form button { border: 0; border-radius: 8px; background: #111827; color: #fff; padding: 12px; cursor: pointer; width: 100%; }
+    .alert { background: #fff7ed; color: #9a3412; padding: 10px; border-radius: 8px; margin: 10px 0; display: none; }
   </style>
+  <% if (currentPayment.paymentMethod === 'card') { %>
+    <script src="https://sdk.mercadopago.com/js/v2"></script>
+  <% } %>
 </head>
-<body>
+<body data-payment-id="<%= currentPayment.localPaymentId %>" data-payment-status="<%= currentPayment.status %>" data-payment-method="<%= currentPayment.paymentMethod %>" data-public-key="<%= publicKey %>" data-card-enabled="<%= currentPayment.paymentMethod === 'card' && !['approved','authorized'].includes(currentPayment.status) ? 'true' : 'false' %>">
   <h1>Pagamento da inscrição</h1>
 
   <section class="card">
     <p><strong>Participante:</strong> <%= currentPayment.buyerName %></p>
     <p><strong>E-mail:</strong> <%= currentPayment.buyerEmail %></p>
+    <p><strong>Tipo:</strong> <%= currentPayment.purchaseType || (currentPayment.caravanCouponCode ? 'caravana' : 'individual') %></p>
+    <p><strong>Total de ingressos:</strong> <%= currentPayment.totalTickets || ((currentPayment.quantityWithoutLunch || 0) + (currentPayment.quantityWithLunch || 0)) %></p>
     <p><strong>Qtd sem almoço:</strong> <%= currentPayment.quantityWithoutLunch %></p>
     <p><strong>Qtd com almoço:</strong> <%= currentPayment.quantityWithLunch %></p>
     <p><strong>Subtotal:</strong> R$ <%= Number(currentPayment.subtotalAmount).toFixed(2) %></p>
-    <p><strong>Desconto:</strong> R$ <%= Number(currentPayment.discountAmount || 0).toFixed(2) %> <% if (currentPayment.couponCode) { %>(cupom: <%= currentPayment.couponCode %>)<% } %></p>
-    <p><strong>Total:</strong> R$ <%= Number(currentPayment.amount).toFixed(2) %></p>
+    <p><strong>Desconto total:</strong> R$ <%= Number(currentPayment.discountAmount || 0).toFixed(2) %></p>
+    <% if (currentPayment.caravanCouponCode || currentPayment.leaderCouponCode) { %>
+      <p class="small">
+        <% if (currentPayment.caravanCouponCode) { %>
+          Caravana: <strong><%= currentPayment.caravanCouponCode %></strong> (-R$ <%= Number(currentPayment.caravanDiscountAmount || 0).toFixed(2) %>)
+        <% } %>
+        <% if (currentPayment.caravanCouponCode && currentPayment.leaderCouponCode) { %> • <% } %>
+        <% if (currentPayment.leaderCouponCode) { %>
+          Líder: <strong><%= currentPayment.leaderCouponCode %></strong> (-R$ <%= Number(currentPayment.leaderDiscountAmount || 0).toFixed(2) %>)
+        <% } %>
+      </p>
+    <% } %>
+    <p data-total-amount="<%= Number(currentPayment.amount).toFixed(2) %>"><strong>Total:</strong> R$ <%= Number(currentPayment.amount).toFixed(2) %></p>
+    <p><strong>Método:</strong> <%= currentPayment.paymentMethod === 'card' ? 'cartão' : 'pix' %></p>
     <p>
       Status:
       <strong id="payment-status" class="status-<%= currentPayment.status %>"><%= currentPayment.status %></strong>
@@ -33,13 +56,38 @@
       <% } %>
     </p>
 
-    <% if (currentPayment.qrCodeBase64) { %>
+    <% if (currentPayment.paymentMethod === 'pix' && currentPayment.qrCodeBase64) { %>
       <img alt="QR Code PIX" width="240" src="data:image/png;base64,<%= currentPayment.qrCodeBase64 %>" />
     <% } %>
 
-    <% if (currentPayment.qrCode) { %>
+    <% if (currentPayment.paymentMethod === 'pix' && currentPayment.qrCode) { %>
       <p class="small">Copia e cola PIX:</p>
-      <p class="mono"><%= currentPayment.qrCode %></p>
+      <div class="copy-row">
+        <p id="pix-code" class="mono" style="flex:1; margin:0;"><%= currentPayment.qrCode %></p>
+        <button type="button" id="copy-pix-button">Copiar chave PIX</button>
+      </div>
+      <div id="copy-feedback" class="copy-feedback">Chave PIX copiada.</div>
+    <% } %>
+
+    <% if (currentPayment.paymentMethod === 'card' && !['approved','authorized'].includes(currentPayment.status)) { %>
+      <div class="alert" id="card-error"></div>
+      <form id="form-checkout" class="card-form">
+        <div id="form-checkout__cardNumber"></div>
+        <div id="form-checkout__expirationDate"></div>
+        <div id="form-checkout__securityCode"></div>
+        <input type="text" id="form-checkout__cardholderName" placeholder="Nome no cartão" />
+        <select id="form-checkout__issuer"></select>
+        <select id="form-checkout__installments"></select>
+        <select id="form-checkout__identificationType"></select>
+        <input type="text" id="form-checkout__identificationNumber" placeholder="CPF do titular" />
+        <input type="email" id="form-checkout__cardholderEmail" value="<%= currentPayment.buyerEmail %>" placeholder="E-mail do titular" />
+        <button type="submit" id="form-checkout__submit">Pagar com cartão</button>
+        <p class="small">Pagamento processado com segurança pelo Mercado Pago.</p>
+      </form>
+    <% } %>
+
+    <% if (currentPayment.paymentMethod === 'card' && currentPayment.cardLastFourDigits) { %>
+      <p class="small">Cartão final <strong><%= currentPayment.cardLastFourDigits %></strong> • Parcelas: <%= currentPayment.installments || 1 %>x</p>
     <% } %>
 
     <p class="small">Última atualização: <span id="updated-at"><%= currentPayment.updatedAt %></span></p>
@@ -47,8 +95,91 @@
 
   <script>
     (function () {
-      const paymentId = "<%= currentPayment.localPaymentId %>";
+      const pageData = document.body.dataset;
+      const paymentId = pageData.paymentId;
       let active = true;
+      const copyButton = document.getElementById('copy-pix-button');
+      const pixCodeElement = document.getElementById('pix-code');
+      const copyFeedback = document.getElementById('copy-feedback');
+      const cardError = document.getElementById('card-error');
+
+      async function copyPixCode() {
+        if (!copyButton || !pixCodeElement) return;
+        try {
+          await navigator.clipboard.writeText(pixCodeElement.textContent.trim());
+          if (copyFeedback) {
+            copyFeedback.style.display = 'block';
+            setTimeout(() => {
+              copyFeedback.style.display = 'none';
+            }, 2500);
+          }
+        } catch (error) {
+          alert('Não foi possível copiar automaticamente.');
+        }
+      }
+
+      if (copyButton) {
+        copyButton.addEventListener('click', copyPixCode);
+      }
+
+      if (pageData.cardEnabled === 'true' && typeof MercadoPago !== 'undefined') {
+        const amountValue = document.querySelector('[data-total-amount]')?.dataset.totalAmount || '0.00';
+        const mp = new MercadoPago(pageData.publicKey, { locale: 'pt-BR' });
+        const cardForm = mp.cardForm({
+          amount: amountValue,
+          iframe: true,
+          form: {
+            id: 'form-checkout',
+            cardNumber: { id: 'form-checkout__cardNumber', placeholder: 'Número do cartão' },
+            expirationDate: { id: 'form-checkout__expirationDate', placeholder: 'MM/AA' },
+            securityCode: { id: 'form-checkout__securityCode', placeholder: 'CVV' },
+            cardholderName: { id: 'form-checkout__cardholderName', placeholder: 'Nome no cartão' },
+            issuer: { id: 'form-checkout__issuer' },
+            installments: { id: 'form-checkout__installments' },
+            identificationType: { id: 'form-checkout__identificationType' },
+            identificationNumber: { id: 'form-checkout__identificationNumber', placeholder: 'CPF do titular' },
+            cardholderEmail: { id: 'form-checkout__cardholderEmail', placeholder: 'E-mail do titular' }
+          },
+          callbacks: {
+            onSubmit: async function (event) {
+              event.preventDefault();
+              if (cardError) {
+                cardError.style.display = 'none';
+                cardError.textContent = '';
+              }
+              const data = cardForm.getCardFormData();
+
+              const response = await fetch(`/payments/${paymentId}/card`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'x-csrf-token': '<%= csrfToken %>'
+                },
+                body: JSON.stringify({
+                  token: data.token,
+                  issuerId: data.issuerId,
+                  paymentMethodId: data.paymentMethodId,
+                  installments: data.installments,
+                  identificationType: data.identificationType,
+                  identificationNumber: data.identificationNumber,
+                  email: data.cardholderEmail
+                })
+              });
+
+              const result = await response.json();
+              if (!response.ok) {
+                if (cardError) {
+                  cardError.textContent = result.error || 'Falha ao processar cartão.';
+                  cardError.style.display = 'block';
+                }
+                return;
+              }
+
+              window.location.href = result.redirectTo || window.location.href;
+            }
+          }
+        });
+      }
 
       async function pollStatus() {
         if (!active) return;
@@ -75,7 +206,7 @@
         }
       }
 
-      if ("<%= currentPayment.status %>" === 'pending') {
+      if (pageData.paymentStatus === 'pending') {
         setInterval(pollStatus, 5000);
       }
     })();

@@ -33,6 +33,20 @@ const TransactionSchema = new mongoose.Schema(
       trim: true,
       maxlength: 30
     },
+    paymentMethod: {
+      type: String,
+      required: true,
+      enum: ['pix', 'card'],
+      default: 'pix',
+      index: true
+    },
+    purchaseType: {
+      type: String,
+      required: true,
+      enum: ['individual', 'caravana'],
+      default: 'individual',
+      index: true
+    },
     quantityWithoutLunch: {
       type: Number,
       required: true,
@@ -44,6 +58,12 @@ const TransactionSchema = new mongoose.Schema(
       required: true,
       min: 0,
       default: 0
+    },
+    totalTickets: {
+      type: Number,
+      required: true,
+      min: 1,
+      index: true
     },
     baseTicketPrice: {
       type: Number,
@@ -64,6 +84,30 @@ const TransactionSchema = new mongoose.Schema(
       type: Number,
       required: true,
       default: 0
+    },
+    caravanDiscountAmount: {
+      type: Number,
+      required: true,
+      default: 0
+    },
+    leaderDiscountAmount: {
+      type: Number,
+      required: true,
+      default: 0
+    },
+    caravanCouponCode: {
+      type: String,
+      default: null,
+      lowercase: true,
+      trim: true,
+      index: true
+    },
+    leaderCouponCode: {
+      type: String,
+      default: null,
+      lowercase: true,
+      trim: true,
+      index: true
     },
     couponCode: {
       type: String,
@@ -86,6 +130,18 @@ const TransactionSchema = new mongoose.Schema(
     statusDetail: {
       type: String,
       default: null
+    },
+    cardLastFourDigits: {
+      type: String,
+      default: null
+    },
+    cardFirstSixDigits: {
+      type: String,
+      default: null
+    },
+    installments: {
+      type: Number,
+      default: 1
     },
     mpPaymentId: {
       type: String,
