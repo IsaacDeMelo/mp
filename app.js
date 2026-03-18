@@ -21,6 +21,7 @@ const MongoStore = connectMongo.default || connectMongo;
 
 const BASE_TICKET_PRICE = 1;
 const LUNCH_ADDON_PRICE = 0.5;
+const MIN_PIX_EXPIRATION_HOURS = 24;
 
 const REQUIRED_ENV = ['MERCADO_PAGO_ACCESS_TOKEN', 'SESSION_SECRET', 'ADMIN_PASSWORD'];
 const missingEnv = REQUIRED_ENV.filter((k) => !process.env[k]);
@@ -87,17 +88,39 @@ function parseQty(value) {
   return n;
 }
 
+function getSingleTicketCap(quantityWithoutLunch, quantityWithLunch) {
+  return quantityWithLunch > 0
+    ? BASE_TICKET_PRICE + LUNCH_ADDON_PRICE
+    : quantityWithoutLunch > 0
+      ? BASE_TICKET_PRICE
+      : 0;
+}
+
+function resolveCouponDiscountValue(coupon, referenceAmount) {
+  if (!coupon || !Number.isFinite(referenceAmount) || referenceAmount <= 0) {
+    return 0;
+  }
+
+  const rawAmount = Number(coupon.discountAmount || 0);
+  if (!Number.isFinite(rawAmount) || rawAmount <= 0) {
+    return 0;
+  }
+
+  const mode = String(coupon.discountMode || 'fixed').toLowerCase();
+  if (mode === 'percent') {
+    return Number((referenceAmount * (rawAmount / 100)).toFixed(2));
+  }
+
+  return rawAmount;
+}
+
 function calcAmounts(quantityWithoutLunch, quantityWithLunch, caravanDiscountValue, leaderDiscountValue) {
   const subtotal =
     quantityWithoutLunch * BASE_TICKET_PRICE +
     quantityWithLunch * (BASE_TICKET_PRICE + LUNCH_ADDON_PRICE);
 
   const maxDiscount = Math.max(0, subtotal - 0.01);
-  const singleTicketCap = quantityWithLunch > 0
-    ? BASE_TICKET_PRICE + LUNCH_ADDON_PRICE
-    : quantityWithoutLunch > 0
-      ? BASE_TICKET_PRICE
-      : 0;
+  const singleTicketCap = getSingleTicketCap(quantityWithoutLunch, quantityWithLunch);
 
   const caravanDiscountAmount = Math.max(caravanDiscountValue || 0, 0);
   const leaderDiscountAmount = Math.min(Math.max(leaderDiscountValue || 0, 0), singleTicketCap);
@@ -124,6 +147,15 @@ function calcAmounts(quantityWithoutLunch, quantityWithLunch, caravanDiscountVal
 
 function couponBadgeType(caravanCoupon) {
   return caravanCoupon ? 'caravana' : 'individual';
+}
+
+function resolvePixExpirationDate() {
+  const raw = Number(process.env.PIX_EXPIRATION_HOURS || MIN_PIX_EXPIRATION_HOURS);
+  const hours = Number.isFinite(raw) && raw >= MIN_PIX_EXPIRATION_HOURS
+    ? raw
+    : MIN_PIX_EXPIRATION_HOURS;
+
+  return new Date(Date.now() + hours * 60 * 60 * 1000);
 }
 
 async function refreshPaymentStatus(localPaymentId) {
@@ -360,13 +392,19 @@ app.post('/checkout', requireCsrf, async (req, res) => {
     }
   }
 
+  const subtotalPreview =
+    quantityWithoutLunch * BASE_TICKET_PRICE +
+    quantityWithLunch * (BASE_TICKET_PRICE + LUNCH_ADDON_PRICE);
+  const singleTicketCap = getSingleTicketCap(quantityWithoutLunch, quantityWithLunch);
+
   const amounts = calcAmounts(
     quantityWithoutLunch,
     quantityWithLunch,
-    caravanCoupon?.discountAmount || 0,
-    leaderCoupon?.discountAmount || 0
+    resolveCouponDiscountValue(caravanCoupon, subtotalPreview),
+    resolveCouponDiscountValue(leaderCoupon, singleTicketCap)
   );
   const localPaymentId = crypto.randomUUID();
+  const pixExpirationDate = resolvePixExpirationDate();
 
   try {
     const webhookUrl = buildWebhookUrl();
@@ -376,6 +414,7 @@ app.post('/checkout', requireCsrf, async (req, res) => {
       payment_method_id: 'pix',
       description: `Ingressos: ${totalTickets} (${quantityWithLunch} c/ almoço)`,
       external_reference: localPaymentId,
+      date_of_expiration: pixExpirationDate.toISOString(),
       payer: {
         email: buyerEmail,
         first_name: buyerName
@@ -416,6 +455,7 @@ app.post('/checkout', requireCsrf, async (req, res) => {
       qrCode: txData.qr_code || null,
       qrCodeBase64: txData.qr_code_base64 || null,
       ticketUrl: txData.ticket_url || null,
+      expiresAt: payment.body?.date_of_expiration ? new Date(payment.body.date_of_expiration) : pixExpirationDate,
       lastCheckedAt: null
     });
 
@@ -670,9 +710,14 @@ app.get('/admin/:slug/dashboard', requireAdminSlug, requireAdminAuth, async (req
 app.post('/admin/:slug/coupons', requireAdminSlug, requireAdminAuth, requireCsrf, async (req, res) => {
   const code = String(req.body.code || '').trim().toLowerCase();
   const discountAmount = Number(req.body.discountAmount);
+  const discountMode = String(req.body.discountMode || 'fixed').trim().toLowerCase();
   const couponType = String(req.body.couponType || '').trim().toLowerCase();
 
-  if (!code || !['caravana', 'lider'].includes(couponType) || !Number.isFinite(discountAmount) || discountAmount <= 0) {
+  const isDiscountModeValid = ['fixed', 'percent'].includes(discountMode);
+  const isDiscountAmountValid = Number.isFinite(discountAmount) && discountAmount > 0;
+  const isPercentInRange = discountMode !== 'percent' || discountAmount <= 100;
+
+  if (!code || !['caravana', 'lider'].includes(couponType) || !isDiscountModeValid || !isDiscountAmountValid || !isPercentInRange) {
     const transactions = await Transaction.find({}).sort({ createdAt: -1 }).lean();
     const coupons = await Coupon.find({}).sort({ createdAt: -1 }).lean();
     return res.status(400).render('admin-dashboard', {
@@ -685,7 +730,7 @@ app.post('/admin/:slug/coupons', requireAdminSlug, requireAdminAuth, requireCsrf
         pendingOrders: transactions.filter((item) => item.status === 'pending' || item.status === 'awaiting_card').length,
         revenue: transactions.filter((item) => item.status === 'approved').reduce((sum, item) => sum + Number(item.amount || 0), 0)
       },
-      error: 'Cupom inválido. Informe tipo, código e desconto maior que 0.',
+      error: 'Cupom inválido. Informe tipo, código e desconto válido (percentual até 100%).',
       message: null
     });
   }
@@ -712,11 +757,49 @@ app.post('/admin/:slug/coupons', requireAdminSlug, requireAdminAuth, requireCsrf
   await Coupon.create({
     code,
     couponType,
+    discountMode,
     discountAmount,
     createdBy: 'admin'
   });
 
   return res.redirect(`/admin/${req.params.slug}/dashboard`);
+});
+
+app.delete('/admin/:slug/coupons/:couponId', requireAdminSlug, requireAdminAuth, requireCsrf, async (req, res) => {
+  const couponId = String(req.params.couponId || '').trim();
+  
+  if (!couponId) {
+    return res.status(400).json({ error: 'ID do cupom inválido.' });
+  }
+
+  try {
+    const coupon = await Coupon.findById(couponId);
+    if (!coupon) {
+      return res.status(404).json({ error: 'Cupom não encontrado.' });
+    }
+
+    await Coupon.deleteOne({ _id: couponId });
+    return res.json({ success: true, message: 'Cupom deletado com sucesso.' });
+  } catch (error) {
+    console.error('Erro ao deletar cupom:', error);
+    return res.status(500).json({ error: 'Erro ao deletar cupom.' });
+  }
+});
+
+app.post('/admin/:slug/coupons/:couponId/delete', requireAdminSlug, requireAdminAuth, requireCsrf, async (req, res) => {
+  const couponId = String(req.params.couponId || '').trim();
+
+  if (!couponId) {
+    return res.status(400).redirect(`/admin/${req.params.slug}/dashboard`);
+  }
+
+  try {
+    await Coupon.deleteOne({ _id: couponId });
+    return res.redirect(`/admin/${req.params.slug}/dashboard`);
+  } catch (error) {
+    console.error('Erro ao deletar cupom por POST:', error);
+    return res.status(500).redirect(`/admin/${req.params.slug}/dashboard`);
+  }
 });
 
 async function startServer() {

@@ -165,6 +165,11 @@ const TransactionSchema = new mongoose.Schema(
       type: String,
       default: null
     },
+    expiresAt: {
+      type: Date,
+      default: null,
+      index: true
+    },
     lastCheckedAt: {
       type: Date,
       default: null

@@ -3,105 +3,488 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Pagamento</title>
+  <title>Status do pagamento</title>
   <style>
-    body { font-family: Arial, sans-serif; max-width: 760px; margin: 24px auto; padding: 0 16px; }
-    .card { border: 1px solid #ddd; border-radius: 10px; padding: 16px; }
-    .mono { font-family: Consolas, monospace; font-size: 12px; word-break: break-all; }
-    .small { font-size: 12px; color: #555; }
-    .status-pending { color: #856404; }
-    .status-approved { color: #155724; font-weight: 700; }
-    .status-rejected, .status-cancelled { color: #721c24; font-weight: 700; }
+    :root {
+      --bg-1: #e6f3ff;
+      --bg-2: #f8fbff;
+      --text: #0f172a;
+      --muted: #64748b;
+      --line: #dbe7f5;
+      --card: #ffffff;
+      --primary: #0ea5e9;
+      --primary-dark: #0284c7;
+      --ok: #16a34a;
+      --warn: #b45309;
+      --bad: #be123c;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Inter, Segoe UI, Arial, sans-serif;
+      font-size: 18px;
+      line-height: 1.55;
+      color: var(--text);
+      background:
+        radial-gradient(900px 420px at 50% -20%, #b3e6ff 0%, transparent 60%),
+        linear-gradient(180deg, var(--bg-1), var(--bg-2));
+      min-height: 100vh;
+    }
+
+    .shell {
+      width: min(980px, 100% - 24px);
+      margin: 18px auto 28px;
+    }
+
+    .hero {
+      text-align: center;
+      margin-bottom: 14px;
+    }
+
+    .hero h1 {
+      margin: 0;
+      font-size: clamp(1.3rem, 3vw, 2rem);
+      letter-spacing: -0.3px;
+    }
+
+    .hero p {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 18px;
+    }
+
+    .status-card {
+      background: linear-gradient(165deg, #ffffff, #f2f8ff);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      box-shadow: 0 16px 40px rgba(2, 132, 199, 0.14);
+      padding: 20px;
+      margin-bottom: 14px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .status-card::before {
+      content: '';
+      position: absolute;
+      inset: auto -70px -85px;
+      height: 200px;
+      background: radial-gradient(circle at center, rgba(14, 165, 233, 0.18), transparent 70%);
+      pointer-events: none;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+      background: #e2e8f0;
+      color: #334155;
+    }
+
+    .status-pending { background: #fff5d6; color: var(--warn); }
+    .status-approved, .status-authorized { background: #dcfce7; color: var(--ok); }
+    .status-rejected, .status-cancelled, .status-expired { background: #ffe4e6; color: var(--bad); }
+
+    .status-title {
+      margin: 14px 0 6px;
+      font-size: clamp(1.1rem, 2.2vw, 1.5rem);
+    }
+
+    .status-subtitle {
+      margin: 0;
+      color: var(--muted);
+      font-size: 18px;
+    }
+
+    .confirm-anim {
+      margin: 14px auto 6px;
+      width: 92px;
+      height: 92px;
+      border-radius: 50%;
+      display: none;
+      place-items: center;
+      background: radial-gradient(circle, rgba(22,163,74,0.2), rgba(22,163,74,0.05));
+      border: 2px solid rgba(22,163,74,0.35);
+      transform: scale(0.7);
+      opacity: 0;
+    }
+
+    .confirm-anim.active {
+      display: grid;
+      animation: popIn 650ms cubic-bezier(0.18, 0.88, 0.32, 1.28) forwards;
+    }
+
+    .confirm-check {
+      width: 34px;
+      height: 18px;
+      border-left: 5px solid var(--ok);
+      border-bottom: 5px solid var(--ok);
+      transform: rotate(-45deg);
+      opacity: 0;
+      animation: checkDraw 420ms ease 280ms forwards;
+    }
+
+    @keyframes popIn {
+      0% { transform: scale(0.7); opacity: 0; }
+      70% { transform: scale(1.08); opacity: 1; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+
+    @keyframes checkDraw {
+      from { opacity: 0; transform: rotate(-45deg) scale(0.7); }
+      to { opacity: 1; transform: rotate(-45deg) scale(1); }
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 14px;
+      align-items: start;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 16px;
+    }
+
+    .meta-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .meta-item {
+      border: 1px solid #e7eef7;
+      border-radius: 12px;
+      padding: 10px;
+      background: #fbfdff;
+    }
+
+    .meta-item strong {
+      display: block;
+      font-size: 14px;
+      color: var(--muted);
+      margin-bottom: 4px;
+      font-weight: 600;
+    }
+
+    .meta-item span {
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    .small { font-size: 15px; color: var(--muted); }
+    .mono { font-family: Consolas, monospace; font-size: 15px; word-break: break-all; }
+
+    .pix-box {
+      border: 1px solid #dbe7f5;
+      border-radius: 14px;
+      padding: 12px;
+      background: #f7fbff;
+      margin-top: 10px;
+    }
+
+    .qr-wrap {
+      width: fit-content;
+      margin: 0 auto 10px;
+      padding: 10px;
+      border-radius: 12px;
+      background: #fff;
+      border: 1px solid #e4edf8;
+    }
+
     .copy-row { display: flex; gap: 8px; align-items: stretch; }
-    .copy-row button { border: 0; border-radius: 8px; background: #2563eb; color: #fff; padding: 10px 14px; cursor: pointer; }
-    .copy-feedback { color: #155724; font-size: 12px; margin-top: 6px; display: none; }
-    .card-form input, .card-form select { width: 100%; padding: 10px; margin: 6px 0; box-sizing: border-box; }
-    .card-form button { border: 0; border-radius: 8px; background: #111827; color: #fff; padding: 12px; cursor: pointer; width: 100%; }
+
+    .btn {
+      border: 0;
+      border-radius: 10px;
+      background: var(--primary);
+      color: #fff;
+      padding: 10px 14px;
+      font-size: 18px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: transform .15s ease, background .2s ease;
+    }
+
+    .btn:hover { background: var(--primary-dark); transform: translateY(-1px); }
+    .btn.secondary { background: #334155; }
+    .btn.ghost { background: #e2e8f0; color: #0f172a; }
+    .copy-feedback { color: var(--ok); font-size: 15px; margin-top: 6px; display: none; }
     .alert { background: #fff7ed; color: #9a3412; padding: 10px; border-radius: 8px; margin: 10px 0; display: none; }
+
+    .card-form input, .card-form select {
+      width: 100%;
+      padding: 10px;
+      margin: 6px 0;
+      font-size: 18px;
+      box-sizing: border-box;
+      border: 1px solid #d6e3f4;
+      border-radius: 10px;
+      background: #fff;
+    }
+
+    .card-form button { width: 100%; margin-top: 4px; }
+
+    @media (max-width: 860px) {
+      .layout { grid-template-columns: 1fr; }
+      .meta-grid { grid-template-columns: 1fr; }
+      .copy-row { flex-direction: column; }
+      .btn { width: 100%; }
+    }
   </style>
   <% if (currentPayment.paymentMethod === 'card') { %>
     <script src="https://sdk.mercadopago.com/js/v2"></script>
   <% } %>
 </head>
 <body data-payment-id="<%= currentPayment.localPaymentId %>" data-payment-status="<%= currentPayment.status %>" data-payment-method="<%= currentPayment.paymentMethod %>" data-public-key="<%= publicKey %>" data-card-enabled="<%= currentPayment.paymentMethod === 'card' && !['approved','authorized'].includes(currentPayment.status) ? 'true' : 'false' %>">
-  <h1>Pagamento da inscrição</h1>
+  <% 
+    function formatarDataBrasilia(data) {
+      if (!data) return '-';
+      return new Intl.DateTimeFormat('pt-BR', {
+        timeZone: 'America/Sao_Paulo',
+        dateStyle: 'short',
+        timeStyle: 'medium'
+      }).format(new Date(data));
+    }
 
-  <section class="card">
-    <p><strong>Participante:</strong> <%= currentPayment.buyerName %></p>
-    <p><strong>E-mail:</strong> <%= currentPayment.buyerEmail %></p>
-    <p><strong>Tipo:</strong> <%= currentPayment.purchaseType || (currentPayment.caravanCouponCode ? 'caravana' : 'individual') %></p>
-    <p><strong>Total de ingressos:</strong> <%= currentPayment.totalTickets || ((currentPayment.quantityWithoutLunch || 0) + (currentPayment.quantityWithLunch || 0)) %></p>
-    <p><strong>Qtd sem almoço:</strong> <%= currentPayment.quantityWithoutLunch %></p>
-    <p><strong>Qtd com almoço:</strong> <%= currentPayment.quantityWithLunch %></p>
-    <p><strong>Subtotal:</strong> R$ <%= Number(currentPayment.subtotalAmount).toFixed(2) %></p>
-    <p><strong>Desconto total:</strong> R$ <%= Number(currentPayment.discountAmount || 0).toFixed(2) %></p>
-    <% if (currentPayment.caravanCouponCode || currentPayment.leaderCouponCode) { %>
-      <p class="small">
-        <% if (currentPayment.caravanCouponCode) { %>
-          Caravana: <strong><%= currentPayment.caravanCouponCode %></strong> (-R$ <%= Number(currentPayment.caravanDiscountAmount || 0).toFixed(2) %>)
-        <% } %>
-        <% if (currentPayment.caravanCouponCode && currentPayment.leaderCouponCode) { %> • <% } %>
-        <% if (currentPayment.leaderCouponCode) { %>
-          Líder: <strong><%= currentPayment.leaderCouponCode %></strong> (-R$ <%= Number(currentPayment.leaderDiscountAmount || 0).toFixed(2) %>)
-        <% } %>
-      </p>
-    <% } %>
-    <p data-total-amount="<%= Number(currentPayment.amount).toFixed(2) %>"><strong>Total:</strong> R$ <%= Number(currentPayment.amount).toFixed(2) %></p>
-    <p><strong>Método:</strong> <%= currentPayment.paymentMethod === 'card' ? 'cartão' : 'pix' %></p>
-    <p>
-      Status:
-      <strong id="payment-status" class="status-<%= currentPayment.status %>"><%= currentPayment.status %></strong>
-      <% if (currentPayment.statusDetail) { %>
-        <span class="small">(<%= currentPayment.statusDetail %>)</span>
-      <% } %>
-    </p>
+    function rotuloStatus(status) {
+      if (status === 'approved' || status === 'authorized') return 'aprovado';
+      if (status === 'pending') return 'aguardando';
+      if (status === 'rejected') return 'recusado';
+      if (status === 'cancelled') return 'cancelado';
+      if (status === 'expired') return 'expirado';
+      return 'atualizado';
+    }
+  %>
+  <main class="shell">
+    <header class="hero">
+      <h1>Acompanhe seu pagamento</h1>
+      <p>Você pode fechar esta página e voltar depois com o mesmo link para consultar o status.</p>
+    </header>
 
-    <% if (currentPayment.paymentMethod === 'pix' && currentPayment.qrCodeBase64) { %>
-      <img alt="QR Code PIX" width="240" src="data:image/png;base64,<%= currentPayment.qrCodeBase64 %>" />
-    <% } %>
+    <section class="status-card">
+      <span id="payment-status" class="badge status-<%= currentPayment.status %>"><%= rotuloStatus(currentPayment.status) %></span>
+      <h2 id="status-title" class="status-title">Processando pagamento</h2>
+      <p id="status-subtitle" class="status-subtitle">Assim que o pagamento for confirmado, esta tela atualiza automaticamente.</p>
 
-    <% if (currentPayment.paymentMethod === 'pix' && currentPayment.qrCode) { %>
-      <p class="small">Copia e cola PIX:</p>
-      <div class="copy-row">
-        <p id="pix-code" class="mono" style="flex:1; margin:0;"><%= currentPayment.qrCode %></p>
-        <button type="button" id="copy-pix-button">Copiar chave PIX</button>
+      <div id="confirm-anim" class="confirm-anim" aria-hidden="true">
+        <div class="confirm-check"></div>
       </div>
-      <div id="copy-feedback" class="copy-feedback">Chave PIX copiada.</div>
-    <% } %>
+      <% if (currentPayment.statusDetail) { %>
+        <p class="small">Detalhe: <span id="status-detail"><%= currentPayment.statusDetail %></span></p>
+      <% } else { %>
+        <p class="small">Detalhe: <span id="status-detail">-</span></p>
+      <% } %>
+    </section>
 
-    <% if (currentPayment.paymentMethod === 'card' && !['approved','authorized'].includes(currentPayment.status)) { %>
-      <div class="alert" id="card-error"></div>
-      <form id="form-checkout" class="card-form">
-        <div id="form-checkout__cardNumber"></div>
-        <div id="form-checkout__expirationDate"></div>
-        <div id="form-checkout__securityCode"></div>
-        <input type="text" id="form-checkout__cardholderName" placeholder="Nome no cartão" />
-        <select id="form-checkout__issuer"></select>
-        <select id="form-checkout__installments"></select>
-        <select id="form-checkout__identificationType"></select>
-        <input type="text" id="form-checkout__identificationNumber" placeholder="CPF do titular" />
-        <input type="email" id="form-checkout__cardholderEmail" value="<%= currentPayment.buyerEmail %>" placeholder="E-mail do titular" />
-        <button type="submit" id="form-checkout__submit">Pagar com cartão</button>
-        <p class="small">Pagamento processado com segurança pelo Mercado Pago.</p>
-      </form>
-    <% } %>
+    <section class="layout">
+      <article class="card">
+        <h3>Resumo da compra</h3>
+        <div class="meta-grid">
+          <div class="meta-item"><strong>Participante</strong><span><%= currentPayment.buyerName %></span></div>
+          <div class="meta-item"><strong>E-mail</strong><span><%= currentPayment.buyerEmail %></span></div>
+          <div class="meta-item"><strong>Tipo</strong><span><%= currentPayment.purchaseType || (currentPayment.caravanCouponCode ? 'caravana' : 'individual') %></span></div>
+          <div class="meta-item"><strong>Total ingressos</strong><span><%= currentPayment.totalTickets || ((currentPayment.quantityWithoutLunch || 0) + (currentPayment.quantityWithLunch || 0)) %></span></div>
+          <div class="meta-item"><strong>Sem almoço</strong><span><%= currentPayment.quantityWithoutLunch %></span></div>
+          <div class="meta-item"><strong>Com almoço</strong><span><%= currentPayment.quantityWithLunch %></span></div>
+          <div class="meta-item"><strong>Subtotal</strong><span>R$ <%= Number(currentPayment.subtotalAmount).toFixed(2) %></span></div>
+          <div class="meta-item"><strong>Desconto</strong><span>R$ <%= Number(currentPayment.discountAmount || 0).toFixed(2) %></span></div>
+          <div class="meta-item"><strong>Total final</strong><span data-total-amount="<%= Number(currentPayment.amount).toFixed(2) %>">R$ <%= Number(currentPayment.amount).toFixed(2) %></span></div>
+          <div class="meta-item"><strong>Método</strong><span><%= currentPayment.paymentMethod === 'card' ? 'cartão' : 'pix' %></span></div>
+        </div>
 
-    <% if (currentPayment.paymentMethod === 'card' && currentPayment.cardLastFourDigits) { %>
-      <p class="small">Cartão final <strong><%= currentPayment.cardLastFourDigits %></strong> • Parcelas: <%= currentPayment.installments || 1 %>x</p>
-    <% } %>
+        <% if (currentPayment.caravanCouponCode || currentPayment.leaderCouponCode) { %>
+          <p class="small" style="margin-top:10px;">
+            <% if (currentPayment.caravanCouponCode) { %>
+              Caravana: <strong><%= currentPayment.caravanCouponCode %></strong> (-R$ <%= Number(currentPayment.caravanDiscountAmount || 0).toFixed(2) %>)
+            <% } %>
+            <% if (currentPayment.caravanCouponCode && currentPayment.leaderCouponCode) { %> • <% } %>
+            <% if (currentPayment.leaderCouponCode) { %>
+              Líder: <strong><%= currentPayment.leaderCouponCode %></strong> (-R$ <%= Number(currentPayment.leaderDiscountAmount || 0).toFixed(2) %>)
+            <% } %>
+          </p>
+        <% } %>
 
-    <p class="small">Última atualização: <span id="updated-at"><%= currentPayment.updatedAt %></span></p>
-  </section>
+        <p class="small">Última atualização: <span id="updated-at"><%= formatarDataBrasilia(currentPayment.updatedAt) %></span></p>
+      </article>
+
+      <aside class="card">
+        <h3>Pagamento</h3>
+
+        <% if (currentPayment.paymentMethod === 'pix' && currentPayment.qrCodeBase64) { %>
+          <div class="pix-box">
+            <div class="qr-wrap">
+              <img alt="Código QR PIX" width="220" src="data:image/png;base64,<%= currentPayment.qrCodeBase64 %>" />
+            </div>
+
+            <% if (currentPayment.qrCode) { %>
+              <p class="small">Copia e cola PIX:</p>
+              <div class="copy-row">
+                <p id="pix-code" class="mono" style="flex:1; margin:0;"><%= currentPayment.qrCode %></p>
+                <button type="button" class="btn" id="copy-pix-button">Copiar chave PIX</button>
+              </div>
+              <div id="copy-feedback" class="copy-feedback">Chave PIX copiada.</div>
+            <% } %>
+
+            <% if (currentPayment.expiresAt) { %>
+              <p class="small">Vencimento: <strong><%= formatarDataBrasilia(currentPayment.expiresAt) %></strong></p>
+            <% } %>
+          </div>
+        <% } %>
+
+        <% if (currentPayment.paymentMethod === 'card' && !['approved','authorized'].includes(currentPayment.status)) { %>
+          <div class="alert" id="card-error"></div>
+          <form id="form-checkout" class="card-form">
+            <div id="form-checkout__cardNumber"></div>
+            <div id="form-checkout__expirationDate"></div>
+            <div id="form-checkout__securityCode"></div>
+            <input type="text" id="form-checkout__cardholderName" placeholder="Nome no cartão" />
+            <select id="form-checkout__issuer"></select>
+            <select id="form-checkout__installments"></select>
+            <select id="form-checkout__identificationType"></select>
+            <input type="text" id="form-checkout__identificationNumber" placeholder="CPF do titular" />
+            <input type="email" id="form-checkout__cardholderEmail" value="<%= currentPayment.buyerEmail %>" placeholder="E-mail do titular" />
+            <button class="btn secondary" type="submit" id="form-checkout__submit">Pagar com cartão</button>
+            <p class="small">Pagamento processado com segurança pelo Mercado Pago.</p>
+          </form>
+        <% } %>
+
+        <% if (currentPayment.paymentMethod === 'card' && currentPayment.cardLastFourDigits) { %>
+          <p class="small">Cartão final <strong><%= currentPayment.cardLastFourDigits %></strong> • Parcelas: <%= currentPayment.installments || 1 %>x</p>
+        <% } %>
+
+      </aside>
+    </section>
+  </main>
 
   <script>
     (function () {
       const pageData = document.body.dataset;
       const paymentId = pageData.paymentId;
+      const storageKey = 'mp:lastPayment';
       let active = true;
       const copyButton = document.getElementById('copy-pix-button');
       const pixCodeElement = document.getElementById('pix-code');
       const copyFeedback = document.getElementById('copy-feedback');
       const cardError = document.getElementById('card-error');
+      const statusEl = document.getElementById('payment-status');
+      const statusTitle = document.getElementById('status-title');
+      const statusSubtitle = document.getElementById('status-subtitle');
+      const statusDetail = document.getElementById('status-detail');
+      const updatedAtEl = document.getElementById('updated-at');
+      const confirmAnim = document.getElementById('confirm-anim');
+
+      function formatarDataBrasilia(data) {
+        if (!data) return '-';
+        try {
+          return new Intl.DateTimeFormat('pt-BR', {
+            timeZone: 'America/Sao_Paulo',
+            dateStyle: 'short',
+            timeStyle: 'medium'
+          }).format(new Date(data));
+        } catch (e) {
+          return String(data);
+        }
+      }
+
+      function isApproved(status) {
+        return status === 'approved' || status === 'authorized';
+      }
+
+      function readableStatus(status) {
+        if (isApproved(status)) return 'Pagamento concluído!';
+        if (status === 'pending') return 'Aguardando pagamento';
+        if (status === 'rejected') return 'Pagamento recusado';
+        if (status === 'cancelled') return 'Pagamento cancelado';
+        if (status === 'expired') return 'Pagamento expirado';
+        return 'Status atualizado';
+      }
+
+      function statusLabel(status) {
+        if (isApproved(status)) return 'aprovado';
+        if (status === 'pending') return 'aguardando';
+        if (status === 'rejected') return 'recusado';
+        if (status === 'cancelled') return 'cancelado';
+        if (status === 'expired') return 'expirado';
+        return 'atualizado';
+      }
+
+      function readableSubtitle(status) {
+        if (isApproved(status)) return 'Parabéns! Seu pagamento foi confirmado com sucesso.';
+        if (status === 'pending') return 'Assim que o pagamento for confirmado, esta tela atualiza automaticamente.';
+        if (status === 'expired') return 'Essa cobrança venceu. Gere uma nova cobrança para continuar.';
+        return 'Você pode tentar novamente ou gerar uma nova cobrança.';
+      }
+
+      function paintStatus(data) {
+        const status = data.status || 'pending';
+
+        if (statusEl) {
+          statusEl.textContent = statusLabel(status);
+          statusEl.className = `badge status-${status}`;
+        }
+
+        if (statusTitle) {
+          statusTitle.textContent = readableStatus(status);
+        }
+
+        if (statusSubtitle) {
+          statusSubtitle.textContent = readableSubtitle(status);
+        }
+
+        if (statusDetail) {
+          statusDetail.textContent = data.statusDetail || '-';
+        }
+
+        if (updatedAtEl && data.updatedAt) {
+          updatedAtEl.textContent = formatarDataBrasilia(data.updatedAt);
+        }
+
+        if (confirmAnim) {
+          if (isApproved(status)) {
+            confirmAnim.classList.remove('active');
+            // Reinicia animação ao mudar para aprovado
+            void confirmAnim.offsetWidth;
+            confirmAnim.classList.add('active');
+          } else {
+            confirmAnim.classList.remove('active');
+          }
+        }
+      }
+
+      function persistSessionPayment(status, updatedAt) {
+        try {
+          const payload = {
+            localPaymentId: paymentId,
+            status,
+            updatedAt: updatedAt || new Date().toISOString(),
+            paymentMethod: pageData.paymentMethod || 'pix',
+            url: `/payment/${paymentId}`
+          };
+          localStorage.setItem(storageKey, JSON.stringify(payload));
+        } catch (e) {
+          // armazenamento indisponível
+        }
+      }
+
+      persistSessionPayment(pageData.paymentStatus || 'pending', new Date().toISOString());
+      paintStatus({
+        status: pageData.paymentStatus || 'pending',
+        statusDetail: statusDetail ? statusDetail.textContent : null,
+        updatedAt: new Date().toISOString()
+      });
 
       async function copyPixCode() {
         if (!copyButton || !pixCodeElement) return;
@@ -187,16 +570,9 @@
           const response = await fetch(`/payments/${paymentId}/status`, { headers: { Accept: 'application/json' } });
           if (!response.ok) return;
           const data = await response.json();
-          const statusEl = document.getElementById('payment-status');
-          const updatedAtEl = document.getElementById('updated-at');
+          paintStatus(data);
 
-          if (statusEl) {
-            statusEl.textContent = data.status;
-            statusEl.className = `status-${data.status}`;
-          }
-          if (updatedAtEl) {
-            updatedAtEl.textContent = data.updatedAt;
-          }
+          persistSessionPayment(data.status, data.updatedAt);
 
           if (data.status !== 'pending') {
             active = false;

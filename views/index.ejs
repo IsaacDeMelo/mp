@@ -5,6 +5,9 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Inscrição e pagamento PIX</title>
+    <script>
+        document.documentElement.classList.add('page-loading');
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Hachi+Maru+Pop&display=swap" rel="stylesheet" />
@@ -27,8 +30,62 @@
         body {
             margin: 0;
             font-family: Inter, Arial, sans-serif;
+            font-size: 18px;
+            line-height: 1.5;
             background: var(--bg);
             color: var(--text);
+            overflow-x: hidden;
+        }
+
+        #page-loader {
+            position: fixed;
+            inset: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            background: #f6f7fb;
+            color: #1f2937;
+            font-size: 20px;
+            z-index: 9999;
+        }
+
+        .loader-logo {
+            width: min(180px, 42vw);
+            height: auto;
+            animation: loaderPulse 1.8s ease-in-out infinite;
+            transform-origin: center;
+            margin-bottom: 10px;
+        }
+
+        .loader-label {
+            font-size: 18px;
+            color: #374151;
+        }
+
+        @keyframes loaderPulse {
+            0% {
+                transform: scale(0.92);
+                opacity: 0.82;
+            }
+
+            50% {
+                transform: scale(1.04);
+                opacity: 1;
+            }
+
+            100% {
+                transform: scale(0.92);
+                opacity: 0.82;
+            }
+        }
+
+        .page-loading body > *:not(#page-loader) {
+            visibility: hidden;
+        }
+
+        .page-loading #page-loader {
+            display: flex;
         }
 
         .container {
@@ -39,6 +96,8 @@
 
         .title {
             margin: 0 0 6px;
+            text-align: center;
+            margin: 40px;
         }
 
         .subtitle {
@@ -68,15 +127,109 @@
             margin-bottom: 12px;
         }
 
+        .session-payment {
+            background: linear-gradient(165deg, #f5f9ff 0%, #eef6ff 100%);
+            border: 1px solid #cfe0ff;
+            border-radius: 14px;
+            padding: 14px;
+            margin-bottom: 14px;
+            box-shadow: 0 8px 20px rgba(37, 99, 235, 0.08);
+        }
+
+        .session-payment.hidden {
+            display: none;
+        }
+
+        .session-payment-title {
+            margin: 0 0 8px;
+            font-size: 20px;
+            font-weight: 700;
+        }
+
+        .session-payment-row {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .session-payment-small {
+            font-size: 15px;
+            color: var(--muted);
+            margin: 6px 0 0;
+        }
+
+        .session-payment-status {
+            font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            border-radius: 999px;
+            padding: 3px 10px;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        .status-pending {
+            color: #854d0e;
+            background: #fef3c7;
+        }
+
+        .status-approved,
+        .status-authorized {
+            color: #166534;
+            background: #dcfce7;
+        }
+
+        .status-rejected,
+        .status-cancelled,
+        .status-expired {
+            color: #991b1b;
+            background: #fee2e2;
+        }
+
+        .status-updated {
+            color: #334155;
+            background: #e2e8f0;
+        }
+
+        .status-cancelled,
+        .status-rejected,
+        .status-expired {
+            color: #8f1111;
+        }
+
+        .session-payment-link,
+        .session-payment-btn {
+            border: 0;
+            border-radius: 8px;
+            padding: 8px 10px;
+            font-size: 16px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+        }
+
+        .session-payment-link {
+            background: #2563eb;
+            color: #fff;
+        }
+
+        .session-payment-btn {
+            background: #e5e7eb;
+            color: #111827;
+        }
+
         h2 {
             margin-top: 0;
-            font-size: 18px;
+            font-size: 24px;
         }
 
         label {
             display: block;
             margin: 10px 0 4px;
-            font-size: 14px;
+            font-size: 18px;
         }
 
         input {
@@ -84,6 +237,7 @@
             padding: 10px;
             border: 1px solid var(--line);
             border-radius: 10px;
+            font-size: 18px;
         }
 
         .grid2 {
@@ -92,16 +246,107 @@
             gap: 10px;
         }
 
+        .product-list {
+            display: flex;
+            gap: 12px;
+            margin-top: 30px;
+            margin-bottom: 30px;
+            width: 100%;
+            flex-wrap: wrap;
+        }
+
+        .product-card {
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            padding: 12px;
+            background: #fafafa;
+            flex: 1 1 calc((100% - 12px) / 2);
+            min-width: 0;
+            max-width: calc((100% - 12px) / 2);
+        }
+
+        .product-photo {
+            width: 100%;
+            aspect-ratio: 4 / 3;
+            border: 1px dashed #bfc6d4;
+            border-radius: 10px;
+            background: #fff;
+            overflow: hidden;
+            position: relative;
+            margin-bottom: 10px;
+        }
+
+        .product-photo-img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            object-position: center;
+            display: block;
+            background: #fff;
+        }
+
+        .product-photo-placeholder {
+            position: absolute;
+            inset: 0;
+            color: var(--muted);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            font-size: 15px;
+            padding: 8px;
+            background: #fff;
+        }
+
+        .product-name {
+            font-weight: 600;
+            margin-bottom: 2px;
+        }
+
+        .product-price {
+            color: var(--muted);
+            font-size: 16px;
+            margin-bottom: 10px;
+        }
+
+        .qty-control {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .qty-btn {
+            width: 34px;
+            height: 34px;
+            border: 1px solid #cbd5e1;
+            border-radius: 10px;
+            background: #fff;
+            color: #0f172a;
+            font-weight: 700;
+            font-size: 22px;
+            line-height: 1;
+            padding: 0;
+            margin: 0;
+            cursor: pointer;
+            flex: 0 0 34px;
+        }
+
+        .qty-input {
+            width: 72px;
+            text-align: center;
+            margin: 0;
+        }
+
         .muted {
             color: var(--muted);
-            font-size: 13px;
+            font-size: 16px;
         }
 
         .summary-row {
             display: flex;
             justify-content: space-between;
             margin: 8px 0;
-            font-size: 14px;
+            font-size: 18px;
         }
 
         .summary-total {
@@ -109,7 +354,7 @@
             padding-top: 12px;
             border-top: 1px dashed var(--line);
             font-weight: 700;
-            font-size: 17px;
+            font-size: 22px;
             display: flex;
             justify-content: space-between;
         }
@@ -177,7 +422,7 @@
             display: none;
         }
 
-        button {
+        .checkout-submit {
             width: 100%;
             margin-top: 14px;
             border: 0;
@@ -193,6 +438,49 @@
             .layout {
                 grid-template-columns: 1fr;
             }
+
+            .container {
+                padding: 0 12px;
+            }
+
+            .card {
+                padding: 12px;
+            }
+
+            .product-list {
+                gap: 8px;
+            }
+
+            .product-card {
+                flex-basis: calc((100% - 8px) / 2);
+                max-width: calc((100% - 8px) / 2);
+                padding: 8px;
+            }
+
+            .qty-control {
+                gap: 4px;
+                display: flex;
+                justify-content: center;
+            }
+
+            .qty-btn {
+                width: 30px;
+                height: 30px;
+                flex-basis: 30px;
+                font-size: 18px;
+            }
+
+            .qty-input {
+                width: 52px;
+                padding: 6px 4px;
+                font-size: 16px;
+            }
+        }
+
+        @media (min-width: 841px) {
+            .event-image {
+                width: 30%;
+            }
         }
 
         .event-image-wrap {
@@ -203,26 +491,43 @@
         }
 
         .event-image {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            flex-direction: column;
-            width: 100%;
+            display: block;
+            width: auto;
             height: auto;
-            max-width: 1600px;
-            margin-bottom: 120px; 
+            max-width: 100%;
+            margin-bottom: 30px; 
+        }
+        form {
+            padding: 0px;
+        }
+        .card{
+            padding: 20px;
         }
     </style>
 </head>
 
 <body>
+    <div id="page-loader">
+        <img class="loader-logo" src="/logoad.png" alt="Carregando" />
+    </div>
     <div class="event-image-wrap">
-        <img class="event-image" src="/2026 (3).png" alt="Banner 2026" />
+        <img class="event-image" src="/2026.png" alt="Banner 2026" />
     </div>
     <main class="container" data-base-price="<%= Number(prices.base).toFixed(2) %>"
         data-lunch-price="<%= Number(prices.lunch).toFixed(2) %>">
-        <h1 class="title">Inscrição</h1>
-        <p class="subtitle">Escolha as quantidades como em um carrinho e gere o PIX em um clique.</p>
+        <section id="session-payment" class="session-payment hidden" aria-live="polite">
+            <p class="session-payment-title">Pagamento salvo nesta sessão</p>
+            <div class="session-payment-row">
+                <span>Status:</span>
+                <strong id="session-payment-status" class="session-payment-status"></strong>
+                <a id="session-payment-link" class="session-payment-link" href="#">Abrir pagamento</a>
+                <button id="session-payment-refresh" class="session-payment-btn" type="button">Atualizar status</button>
+                <button id="session-payment-close" class="session-payment-btn" type="button">Fechar pendência</button>
+            </div>
+            <p id="session-payment-meta" class="session-payment-small"></p>
+        </section>
+
+
 
         <% if (error) { %>
             <div class="error">
@@ -243,31 +548,43 @@
 
                         <label>Telefone (opcional)</label>
                         <input type="tel" name="buyerPhone" maxlength="30" />
-
-                        <h2 style="margin-top:16px;">Seu carrinho</h2>
-                        <div class="grid2">
-                            <div>
-                                <label>Ingressos sem almoço</label>
-                                <input id="qtyWithout" type="number" name="quantityWithoutLunch" min="0" step="1"
-                                    value="1" required />
-                                <div class="muted">R$ <%= Number(prices.base).toFixed(2) %> por ingresso</div>
-                            </div>
-                            <div>
-                                <label>Ingressos com almoço</label>
-                                <input id="qtyWith" type="number" name="quantityWithLunch" min="0" step="1" value="0"
-                                    required />
-                                <div class="muted">R$ <%= Number(prices.base + prices.lunch).toFixed(2) %> por ingresso
+                        <div class="product-list">
+                            <article class="product-card">
+                                <div class="product-photo">
+                                    <img class="product-photo-img" src="/1.png" alt="Foto do ingresso sem almoço" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+                                    <span class="product-photo-placeholder">Adicione a foto em /public/produto-sem-almoco.png</span>
                                 </div>
-                            </div>
+                                <div class="product-name">Ingresso sem almoço</div>
+                                <div class="product-price">R$ <%= Number(prices.base).toFixed(2) %> por ingresso</div>
+                                <div class="qty-control">
+                                    <button type="button" class="qty-btn" data-target="qtyWithout" data-step="-1" aria-label="Diminuir ingresso sem almoço">-</button>
+                                    <input class="qty-input" id="qtyWithout" type="number" name="quantityWithoutLunch" min="0" step="1" value="1" required />
+                                    <button type="button" class="qty-btn" data-target="qtyWithout" data-step="1" aria-label="Aumentar ingresso sem almoço">+</button>
+                                </div>
+                            </article>
+
+                            <article class="product-card">
+                                <div class="product-photo">
+                                    <img class="product-photo-img" src="/2.png" alt="Foto do ingresso com almoço" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+                                    <span class="product-photo-placeholder">Adicione a foto em /public/produto-com-almoco.png</span>
+                                </div>
+                                <div class="product-name">Ingresso com almoço</div>
+                                <div class="product-price">R$ <%= Number(prices.base + prices.lunch).toFixed(2) %> por ingresso</div>
+                                <div class="qty-control">
+                                    <button type="button" class="qty-btn" data-target="qtyWith" data-step="-1" aria-label="Diminuir ingresso com almoço">-</button>
+                                    <input class="qty-input" id="qtyWith" type="number" name="quantityWithLunch" min="0" step="1" value="0" required />
+                                    <button type="button" class="qty-btn" data-target="qtyWith" data-step="1" aria-label="Aumentar ingresso com almoço">+</button>
+                                </div>
+                            </article>
                         </div>
 
                         <div style="margin-top:10px;">
                             <label>Cupom de desconto (opcional)</label>
-                            <input type="text" id="couponInput" placeholder="ex: caravana_rionovo ou lider_rionovo" />
+                            <input type="text" id="couponInput" placeholder="" />
                             <input type="hidden" name="caravanCouponCode" id="caravanCouponCode" />
                             <input type="hidden" name="leaderCouponCode" id="leaderCouponCode" />
                         </div>
-                        <div class="muted">Apenas 1 cupom por compra (caravana ou líder).</div>
+                  
                     </section>
 
                     <aside class="card">
@@ -281,12 +598,25 @@
                         <input type="hidden" name="paymentMethod" value="pix" />
                         <p class="muted">Pagamento disponível no momento: PIX.</p>
 
-                        <button type="submit">Gerar PIX</button>
+                        <button class="checkout-submit" type="submit">Gerar PIX</button>
                     </aside>
                 </form>
     </main>
 
     <script>
+        (function () {
+            function unlockPage() {
+                document.documentElement.classList.remove('page-loading');
+            }
+
+            if (document.readyState === 'complete') {
+                unlockPage();
+                return;
+            }
+
+            window.addEventListener('load', unlockPage, { once: true });
+        })();
+
         (function () {
             const container = document.querySelector('.container');
             const base = Number(container?.dataset.basePrice || '0');
@@ -299,6 +629,13 @@
             const couponInput = document.getElementById('couponInput');
             const caravanCouponCodeInput = document.getElementById('caravanCouponCode');
             const leaderCouponCodeInput = document.getElementById('leaderCouponCode');
+            const pendingBox = document.getElementById('session-payment');
+            const pendingStatusEl = document.getElementById('session-payment-status');
+            const pendingMetaEl = document.getElementById('session-payment-meta');
+            const pendingLinkEl = document.getElementById('session-payment-link');
+            const pendingRefreshEl = document.getElementById('session-payment-refresh');
+            const pendingCloseEl = document.getElementById('session-payment-close');
+            const storageKey = 'mp:lastPayment';
 
             // Conjunto de prefixos que identificam cupons de líder (case-insensitive)
             const LEADER_PREFIXES = ['lider', 'líder'];
@@ -327,6 +664,103 @@
                 return Number.isInteger(n) && n > 0 ? n : 0;
             }
 
+            function formatarDataBrasilia(data) {
+                if (!data) return 'agora';
+                try {
+                    return new Intl.DateTimeFormat('pt-BR', {
+                        timeZone: 'America/Sao_Paulo',
+                        dateStyle: 'short',
+                        timeStyle: 'medium'
+                    }).format(new Date(data));
+                } catch (e) {
+                    return 'agora';
+                }
+            }
+
+            function statusLabel(status) {
+                if (status === 'approved' || status === 'authorized') return 'Aprovado';
+                if (status === 'pending') return 'Aguardando';
+                if (status === 'rejected') return 'Recusado';
+                if (status === 'cancelled') return 'Cancelado';
+                if (status === 'expired') return 'Expirado';
+                return 'Atualizado';
+            }
+
+            function readSessionPayment() {
+                try {
+                    const raw = localStorage.getItem(storageKey);
+                    if (!raw) return null;
+                    const parsed = JSON.parse(raw);
+                    if (!parsed || !parsed.localPaymentId) return null;
+                    return parsed;
+                } catch (e) {
+                    return null;
+                }
+            }
+
+            function saveSessionPayment(data) {
+                localStorage.setItem(storageKey, JSON.stringify(data));
+            }
+
+            function clearSessionPayment() {
+                localStorage.removeItem(storageKey);
+                if (pendingBox) pendingBox.classList.add('hidden');
+            }
+
+            function paintSessionPayment(state) {
+                if (!pendingBox || !state) return;
+
+                const status = String(state.status || 'pending');
+                pendingBox.classList.remove('hidden');
+
+                if (pendingStatusEl) {
+                    pendingStatusEl.textContent = statusLabel(status);
+                    pendingStatusEl.className = `session-payment-status status-${status || 'updated'}`;
+                }
+
+                if (pendingMetaEl) {
+                    const updated = formatarDataBrasilia(state.updatedAt);
+                    pendingMetaEl.textContent = `Pagamento: ${state.localPaymentId} • Atualizado em: ${updated}`;
+                }
+
+                if (pendingLinkEl) {
+                    pendingLinkEl.href = `/payment/${state.localPaymentId}`;
+                }
+            }
+
+            async function refreshSessionPaymentStatus() {
+                const state = readSessionPayment();
+                if (!state || !state.localPaymentId) {
+                    clearSessionPayment();
+                    return;
+                }
+
+                try {
+                    const response = await fetch(`/payments/${state.localPaymentId}/status`, {
+                        headers: { Accept: 'application/json' }
+                    });
+
+                    if (!response.ok) {
+                        paintSessionPayment(state);
+                        return;
+                    }
+
+                    const latest = await response.json();
+                    const next = {
+                        ...state,
+                        status: latest.status,
+                        statusDetail: latest.statusDetail || null,
+                        updatedAt: latest.updatedAt,
+                        url: `/payment/${state.localPaymentId}`
+                    };
+
+                    saveSessionPayment(next);
+                    paintSessionPayment(next);
+                } catch (e) {
+                    paintSessionPayment(state);
+                }
+            }
+
             function render() {
                 const qWithout = safeInt(qtyWithout.value);
                 const qWith = safeInt(qtyWith.value);
@@ -342,10 +776,40 @@
             qtyWithout.addEventListener('input', render);
             qtyWith.addEventListener('input', render);
 
+            document.querySelectorAll('.qty-btn').forEach((btn) => {
+                btn.addEventListener('click', () => {
+                    const targetId = btn.dataset.target;
+                    const delta = Number(btn.dataset.step || '0');
+                    const input = document.getElementById(targetId);
+                    if (!input) return;
+
+                    const current = Number(input.value);
+                    const safeCurrent = Number.isInteger(current) && current > 0 ? current : 0;
+                    const next = Math.max(0, safeCurrent + delta);
+
+                    input.value = String(next);
+                    render();
+                });
+            });
+
             // Garante que o cupom seja roteado mesmo quando o form é submetido sem ter disparado 'input'
             document.getElementById('checkout-form').addEventListener('submit', () => {
                 if (couponInput) routeCoupon(couponInput.value);
             });
+
+            if (pendingRefreshEl) {
+                pendingRefreshEl.addEventListener('click', refreshSessionPaymentStatus);
+            }
+
+            if (pendingCloseEl) {
+                pendingCloseEl.addEventListener('click', clearSessionPayment);
+            }
+
+            const existing = readSessionPayment();
+            if (existing) {
+                paintSessionPayment(existing);
+                refreshSessionPaymentStatus();
+            }
 
             render();
         })();

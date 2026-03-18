@@ -6,38 +6,68 @@
   <title>Admin - Inscrições</title>
   <style>
     :root {
-      --bg: #f4f7fb;
+      --bg: #f5f5f7;
       --card: #ffffff;
-      --line: #e5e7eb;
-      --text: #0f172a;
-      --muted: #64748b;
-      --accent: #2563eb;
-      --success: #16a34a;
-      --warning: #d97706;
-      --danger: #dc2626;
+      --line: #e7e7ec;
+      --text: #1d1d1f;
+      --muted: #6e6e73;
+      --accent: #0071e3;
+      --accent-2: #1e40af;
+      --success: #13803a;
+      --warning: #a15c00;
+      --danger: #b42318;
     }
     * { box-sizing: border-box; }
-    body { margin: 0; font-family: Inter, Arial, sans-serif; background: var(--bg); color: var(--text); }
-    .container { max-width: 1280px; margin: 0 auto; padding: 24px 16px 40px; }
+    body {
+      margin: 0;
+      font-family: "SF Pro Text", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: radial-gradient(circle at top, #ffffff 0%, var(--bg) 55%);
+      color: var(--text);
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+      position: relative;
+      overflow-x: hidden;
+    }
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url('/logoad.png');
+      background-repeat: no-repeat;
+      background-position: center 56%;
+      background-size: min(62vw, 760px);
+      opacity: 0.05;
+      pointer-events: none;
+      z-index: 0;
+    }
+    .container { max-width: 1280px; margin: 0 auto; padding: 24px 16px 40px; position: relative; z-index: 1; }
     .hero {
       display: flex; justify-content: space-between; align-items: center; gap: 16px;
-      margin-bottom: 18px; padding: 22px; border-radius: 20px;
-      background: linear-gradient(135deg, #0f172a, #1d4ed8); color: #fff;
-      box-shadow: 0 20px 50px rgba(37, 99, 235, 0.18);
+      margin-bottom: 20px; padding: 24px; border-radius: 24px;
+      background: linear-gradient(145deg, #0b1f52, #1f5ecb 70%, #4da3ff);
+      color: #fff;
+      box-shadow: 0 24px 50px rgba(0, 65, 160, 0.25);
     }
-    .hero h1 { margin: 0 0 8px; }
-    .hero p { margin: 0; color: rgba(255,255,255,0.82); }
+    .hero h1 { margin: 0 0 8px; font-size: clamp(1.45rem, 2.2vw, 2rem); letter-spacing: -0.02em; }
+    .hero p { margin: 0; color: rgba(255,255,255,0.88); font-size: 15px; }
     .hero button {
       border: 0; border-radius: 12px; padding: 12px 16px; cursor: pointer;
-      background: rgba(255,255,255,0.14); color: #fff; font-weight: 700;
+      background: rgba(255,255,255,0.2); color: #fff; font-weight: 700;
     }
-    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 18px; }
+    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 20px; }
     .stat-card, .panel { background: var(--card); border: 1px solid var(--line); border-radius: 18px; }
-    .stat-card { padding: 18px; }
-    .stat-label { color: var(--muted); font-size: 13px; margin-bottom: 8px; }
-    .stat-value { font-size: 28px; font-weight: 800; }
+    .stat-card {
+      padding: 18px;
+      box-shadow: 0 12px 24px rgba(15, 23, 42, 0.06);
+    }
+    .stat-label { color: var(--muted); font-size: 13px; margin-bottom: 8px; font-weight: 600; }
+    .stat-value { font-size: 30px; font-weight: 800; letter-spacing: -0.02em; }
     .panels { display: grid; grid-template-columns: 360px 1fr; gap: 18px; align-items: start; }
-    .panel { padding: 18px; overflow: hidden; }
+    .panel {
+      padding: 18px;
+      overflow: hidden;
+      box-shadow: 0 12px 24px rgba(15, 23, 42, 0.05);
+    }
     h2 { margin: 0 0 14px; font-size: 18px; }
     .error {
       background: #fee2e2; color: #991b1b; border: 1px solid #fecaca;
@@ -47,18 +77,19 @@
     .field label { display: block; margin-bottom: 6px; font-size: 14px; }
     .field input, .field select {
       width: 100%; padding: 11px 12px; border: 1px solid var(--line); border-radius: 12px;
-      background: #fff; font-size: 14px;
+      background: #fff; font-size: 14px; color: var(--text);
     }
     .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .help { margin-top: 8px; color: var(--muted); font-size: 12px; line-height: 1.45; }
     .primary-btn {
       width: 100%; border: 0; border-radius: 12px; padding: 12px 14px;
-      background: linear-gradient(135deg, #2563eb, #1d4ed8); color: #fff; font-weight: 700; cursor: pointer;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      color: #fff; font-weight: 700; cursor: pointer;
     }
     .table-wrap { overflow: auto; border: 1px solid var(--line); border-radius: 14px; }
     table { width: 100%; border-collapse: collapse; min-width: 820px; }
     th, td { border-bottom: 1px solid var(--line); padding: 10px 12px; text-align: left; font-size: 13px; vertical-align: top; }
-    th { background: #f8fafc; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+    th { background: #fbfbfd; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
     .badge {
       display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 5px 10px;
       font-size: 12px; font-weight: 700;
@@ -69,6 +100,7 @@
     .badge-approved { background: #dcfce7; color: #166534; }
     .badge-pending { background: #fef3c7; color: #92400e; }
     .badge-awaiting_card { background: #e0f2fe; color: #075985; }
+    .badge-cancelled, .badge-rejected, .badge-expired { background: #fee2e2; color: #991b1b; }
     .badge-default { background: #f1f5f9; color: #334155; }
     .mono { font-family: Consolas, monospace; font-size: 12px; }
     .coupon-stack { display: grid; gap: 8px; }
@@ -78,6 +110,19 @@
     .coupon-top { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
     .coupon-code { font-weight: 800; }
     .coupon-meta { color: var(--muted); font-size: 12px; }
+    .btn-delete-coupon {
+      display: block; margin-top: 12px; width: 100%; padding: 8px 10px;
+      border: 1px solid #fee2e2; border-radius: 8px; background: #fff;
+      color: #991b1b; font-size: 13px; font-weight: 600; cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .btn-delete-coupon:hover {
+      background: #fee2e2; border-color: #df6362;
+    }
+    @keyframes fadeOut {
+      from { opacity: 1; transform: translateX(0); }
+      to { opacity: 0; transform: translateX(-20px); }
+    }
     @media (max-width: 1100px) {
       .stats { grid-template-columns: repeat(2, 1fr); }
       .panels { grid-template-columns: 1fr; }
@@ -90,6 +135,84 @@
   </style>
 </head>
 <body>
+  <%
+    // Funções para uso nos templates EJS
+    function formatarDataBrasilia(data) {
+      if (!data) return '-';
+      return new Intl.DateTimeFormat('pt-BR', {
+        timeZone: 'America/Sao_Paulo',
+        dateStyle: 'short',
+        timeStyle: 'medium'
+      }).format(new Date(data));
+    }
+
+    function rotuloStatus(status) {
+      if (status === 'approved') return 'aprovado';
+      if (status === 'pending') return 'aguardando';
+      if (status === 'awaiting_card') return 'aguardando cartão';
+      if (status === 'cancelled') return 'cancelado';
+      if (status === 'rejected') return 'recusado';
+      if (status === 'expired') return 'expirado';
+      return status || 'desconhecido';
+    }
+
+    function rotuloTipo(tipo) {
+      return tipo === 'caravana' ? 'caravana' : 'individual';
+    }
+
+    function rotuloModoDesconto(mode) {
+      return mode === 'percent' ? 'percentual' : 'valor fixo';
+    }
+
+    function formatarDesconto(cupom) {
+      if (!cupom) return '-';
+      const valor = Number(cupom.discountAmount || 0);
+      const modo = String(cupom.discountMode || 'fixed').trim().toLowerCase();
+      if (modo === 'percent') {
+        return valor.toFixed(2).toString() + '%';
+      }
+      return 'R$ ' + valor.toFixed(2);
+    }
+  %>
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const discountModeField = document.querySelector('select[name="discountMode"]');
+      const discountAmountField = document.querySelector('input[name="discountAmount"]');
+      const discountAmountLabel = document.getElementById('discount-amount-label');
+
+      function syncDiscountFieldMode() {
+        if (!discountModeField || !discountAmountField || !discountAmountLabel) {
+          return;
+        }
+        const mode = (discountModeField.value || 'fixed').toLowerCase();
+        if (mode === 'percent') {
+          discountAmountLabel.textContent = 'Desconto (%)';
+          discountAmountField.max = '100';
+          discountAmountField.placeholder = 'Ex: 15';
+        } else {
+          discountAmountLabel.textContent = 'Desconto (R$)';
+          discountAmountField.removeAttribute('max');
+          discountAmountField.placeholder = 'Ex: 20.00';
+        }
+      }
+
+      syncDiscountFieldMode();
+      if (discountModeField) {
+        discountModeField.addEventListener('change', syncDiscountFieldMode);
+      }
+
+      const deleteForms = document.querySelectorAll('.js-delete-coupon-form');
+      deleteForms.forEach(function(form) {
+        form.addEventListener('submit', function(event) {
+          const couponCode = form.getAttribute('data-coupon-code') || 'este cupom';
+          const confirmed = window.confirm('Tem certeza que deseja deletar o cupom "' + couponCode + '"? Você poderá recriá-lo depois.');
+          if (!confirmed) {
+            event.preventDefault();
+          }
+        });
+      });
+    });
+  </script>
   <main class="container">
     <section class="hero">
       <div>
@@ -139,21 +262,29 @@
             </select>
           </div>
 
+          <div class="field">
+            <label>Modo do desconto</label>
+            <select name="discountMode" required>
+              <option value="fixed">Valor fixo (R$)</option>
+              <option value="percent">Percentual (%)</option>
+            </select>
+          </div>
+
           <div class="field-row">
             <div class="field">
               <label>Código</label>
               <input type="text" name="code" placeholder="caravana_rionovo" required />
             </div>
             <div class="field">
-              <label>Desconto (R$)</label>
-              <input type="number" name="discountAmount" min="0.01" step="0.01" required />
+              <label id="discount-amount-label">Desconto (R$)</label>
+              <input type="number" name="discountAmount" min="0.01" step="0.01" required placeholder="Ex: 20.00" />
             </div>
           </div>
 
           <div class="help">
             Cupom de caravana: aplica o desconto normalmente no pedido.<br />
             Cupom de líder: aplica o desconto apenas em 1 ingresso da compra.<br />
-            É permitido usar 1 cupom de caravana + 1 cupom de líder juntos.
+            Desconto pode ser em valor fixo ou percentual (até 100%).
           </div>
 
           <button class="primary-btn" type="submit">Criar cupom</button>
@@ -162,17 +293,22 @@
         <h2 style="margin-top:22px;">Cupons cadastrados</h2>
         <div class="coupon-stack">
           <% coupons.forEach(function(c) { %>
-            <article class="coupon-item">
+            <article class="coupon-item" data-coupon-id="<%= c._id %>">
               <div class="coupon-top">
                 <div>
                   <div class="coupon-code"><%= c.code %></div>
-                  <div class="coupon-meta">Criado em <%= c.createdAt %></div>
+                  <div class="coupon-meta">Criado em <%= formatarDataBrasilia(c.createdAt) %></div>
                 </div>
                 <span class="badge <%= c.couponType === 'lider' ? 'badge-lider' : 'badge-caravana' %>"><%= c.couponType %></span>
               </div>
-              <div class="coupon-meta">Desconto: R$ <%= Number(c.discountAmount).toFixed(2) %></div>
+              <div class="coupon-meta">Modo: <%= rotuloModoDesconto(c.discountMode || 'fixed') %></div>
+              <div class="coupon-meta">Desconto: <%= formatarDesconto(c) %></div>
               <div class="coupon-meta">Usos: <%= c.usageCount || 0 %></div>
               <div class="coupon-meta">Último pedido: <span class="mono"><%= c.lastUsedByPaymentId || '-' %></span></div>
+              <form class="js-delete-coupon-form" data-coupon-code="<%= c.code %>" action="/admin/<%= adminPath %>/coupons/<%= c._id %>/delete" method="POST">
+                <input type="hidden" name="csrfToken" value="<%= csrfToken %>" />
+                <button type="submit" class="btn-delete-coupon">Deletar</button>
+              </form>
             </article>
           <% }) %>
         </div>
@@ -195,12 +331,17 @@
               </tr>
             </thead>
             <tbody>
+              <% if (!transactions.length) { %>
+                <tr>
+                  <td colspan="8" style="text-align:center; color:#6e6e73; padding:18px;">Nenhum pagamento registrado.</td>
+                </tr>
+              <% } %>
               <% transactions.forEach(function(t) { %>
                 <tr>
-                  <td><%= t.createdAt %></td>
+                  <td><%= formatarDataBrasilia(t.createdAt) %></td>
                   <td>
                     <span class="badge <%= (t.purchaseType || 'individual') === 'caravana' ? 'badge-caravana' : 'badge-individual' %>">
-                      <%= t.purchaseType || 'individual' %>
+                      <%= rotuloTipo(t.purchaseType || 'individual') %>
                     </span>
                   </td>
                   <td>
@@ -219,7 +360,7 @@
                     <strong>Total: R$ <%= Number(t.amount || 0).toFixed(2) %></strong>
                   </td>
                   <td>
-                    <span class="badge badge-<%= ['approved','pending','awaiting_card'].includes(t.status) ? t.status : 'default' %>"><%= t.status %></span>
+                    <span class="badge badge-<%= ['approved','pending','awaiting_card','cancelled','rejected','expired'].includes(t.status) ? t.status : 'default' %>"><%= rotuloStatus(t.status) %></span>
                   </td>
                   <td>
                     Caravana: <%= t.caravanCouponCode || '-' %><br />
