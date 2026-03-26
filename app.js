@@ -433,16 +433,27 @@ app.post('/checkout', requireCsrf, async (req, res) => {
     });
 
     if (!caravanCoupon) {
-      return res.status(400).render('index', {
-        error: 'Cupom de caravana inválido.',
-        message: null,
-        prices: { base: getBaseTicketPrice(), lunch: getLunchAddonPrice() },
-        publicKey: process.env.MERCADO_PAGO_PUBLIC_KEY
+      // Fallback: se o frontend classificou errado por prefixo, tenta como cupom de líder.
+      const fallbackLeaderCoupon = await Coupon.findOne({
+        code: caravanCouponInput,
+        couponType: 'lider',
+        isActive: true
       });
+
+      if (fallbackLeaderCoupon) {
+        leaderCoupon = fallbackLeaderCoupon;
+      } else {
+        return res.status(400).render('index', {
+          error: 'Cupom inválido.',
+          message: null,
+          prices: { base: getBaseTicketPrice(), lunch: getLunchAddonPrice() },
+          publicKey: process.env.MERCADO_PAGO_PUBLIC_KEY
+        });
+      }
     }
   }
 
-  if (leaderCouponInput) {
+  if (leaderCouponInput && !leaderCoupon) {
     leaderCoupon = await Coupon.findOne({
       code: leaderCouponInput,
       couponType: 'lider',
@@ -801,13 +812,15 @@ app.post('/payment/:localPaymentId/confirm-leader', async (req, res) => {
     }
 
     // Cupom de líder passa a ser consumido somente na confirmação.
-    if (tx.leaderCouponCode) {
+    // Idempotência: se este pagamento já consumiu cupom, não incrementa novamente.
+    if (tx.leaderCouponCode && !tx.leaderCouponAlreadyUsed) {
       const consumedCoupon = await Coupon.findOneAndUpdate(
         {
           code: tx.leaderCouponCode,
           couponType: 'lider',
           isActive: true,
-          $or: [{ singleUse: false }, { usageCount: 0 }]
+          $or: [{ singleUse: false }, { usageCount: 0 }],
+          lastUsedByPaymentId: { $ne: tx.localPaymentId }
         },
         {
           $inc: { usageCount: 1 },
