@@ -19,8 +19,8 @@ const PORT = Number(process.env.PORT || 3000);
 const MONGODB_URI = process.env.MONGODB_URI || process.env.MONGO_URI;
 const MongoStore = connectMongo.default || connectMongo;
 
-const BASE_TICKET_PRICE = 1;
-const LUNCH_ADDON_PRICE = 0.5;
+const BASE_TICKET_PRICE = 60;
+const LUNCH_ADDON_PRICE = 20;
 const MIN_PIX_EXPIRATION_HOURS = 24;
 
 const REQUIRED_ENV = ['MERCADO_PAGO_ACCESS_TOKEN', 'SESSION_SECRET', 'ADMIN_PASSWORD'];
