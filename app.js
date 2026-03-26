@@ -441,6 +441,14 @@ app.post('/checkout', requireCsrf, async (req, res) => {
       });
 
       if (fallbackLeaderCoupon) {
+        if (fallbackLeaderCoupon.usageCount > 0) {
+          return res.status(400).render('index', {
+            error: 'Este cupom de líder já foi utilizado e não pode ser reutilizado.',
+            message: null,
+            prices: { base: getBaseTicketPrice(), lunch: getLunchAddonPrice() },
+            publicKey: process.env.MERCADO_PAGO_PUBLIC_KEY
+          });
+        }
         leaderCoupon = fallbackLeaderCoupon;
       } else {
         return res.status(400).render('index', {
@@ -833,13 +841,25 @@ app.post('/payment/:localPaymentId/confirm-leader', async (req, res) => {
       );
 
       if (!consumedCoupon) {
-        return res.status(409).json({ error: 'Este cupom de líder já foi utilizado ou está inativo.' });
+        // Compatibilidade com fluxo antigo: cupom já estava marcado para este pagamento,
+        // mas não foi removido.
+        const legacyConsumedCoupon = await Coupon.findOne({
+          code: tx.leaderCouponCode,
+          couponType: 'lider',
+          lastUsedByPaymentId: tx.localPaymentId
+        });
+
+        if (!legacyConsumedCoupon) {
+          return res.status(409).json({ error: 'Este cupom de líder já foi utilizado ou está inativo.' });
+        }
+
+        await Coupon.deleteOne({ _id: legacyConsumedCoupon._id });
+        tx.leaderCouponAlreadyUsed = true;
+      } else {
+        // Remove o cupom após consumo para liberar o mesmo código no futuro.
+        await Coupon.deleteOne({ _id: consumedCoupon._id });
+        tx.leaderCouponAlreadyUsed = true;
       }
-
-      // Remove o cupom após consumo para liberar o mesmo código no futuro.
-      await Coupon.deleteOne({ _id: consumedCoupon._id });
-
-      tx.leaderCouponAlreadyUsed = true;
     }
 
     // Marcar como confirmado
