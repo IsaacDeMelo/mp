@@ -84,4 +84,69 @@ async function sendConfirmationEmail(transaction) {
   }
 }
 
-module.exports = { sendConfirmationEmail };
+async function sendLeaderConfirmationEmail(transaction) {
+  if (!transaction) return;
+
+  const totalTickets = transaction.totalTickets;
+  const originalPrice = transaction.subtotalAmount;
+  const discountValue = transaction.leaderDiscountAmount || 0;
+  const finalPrice = transaction.amount;
+
+  const htmlContent = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;">
+      <div style="background-color: #8b5cf6; color: #ffffff; padding: 20px; text-align: center;">
+        <h2 style="margin: 0; font-size: 24px;">Inscrição de Líder Confirmada!</h2>
+        <p style="margin: 5px 0 0 0; opacity: 0.9;">Sua inscrição foi processada com sucesso</p>
+      </div>
+
+      <div style="padding: 24px;">
+        <p>Olá, <strong>${transaction.buyerName}</strong>.</p>
+        <p>Sua inscrição como líder foi confirmada! Você está pronto para o evento.</p>
+        
+        <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; padding: 16px; border-radius: 8px; margin: 24px 0;">
+          <h3 style="margin-top: 0; font-size: 18px; color: #1e293b; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px;">Resumo da Inscrição</h3>
+          
+          <ul style="list-style-type: none; padding: 0; margin: 0; font-size: 15px; line-height: 1.6;">
+            <li style="margin-bottom: 8px;"><strong>Status:</strong> <span style="color: #16a34a; font-weight: bold;">✔ Confirmado</span></li>
+            <li style="margin-bottom: 8px;"><strong>Data da Confirmação:</strong> ${formatData(new Date())}</li>
+            <li style="margin-bottom: 8px;"><strong>Código da Inscrição:</strong> ${transaction.localPaymentId}</li>
+            <li style="margin-bottom: 16px;"><strong>Cupom Aplicado:</strong> <span style="color: #8b5cf6; font-weight: bold;">${transaction.leaderCouponCode || 'N/A'}</span></li>
+            
+            <h4 style="margin: 16px 0 8px 0; font-size: 16px; color: #334155;">Detalhes dos Ingressos</h4>
+            <li style="margin-bottom: 8px;"><strong>Total de Ingressos:</strong> ${totalTickets}</li>
+            <li style="margin-bottom: 8px;">Com almoço: ${transaction.quantityWithLunch} | Sem almoço: ${transaction.quantityWithoutLunch}</li>
+            
+            <div style="margin-top: 16px; padding-top: 16px; border-top: 2px dashed #cbd5e1;">
+              <li style="margin-bottom: 8px;"><strong>Valor Original:</strong> <span style="text-decoration: line-through; color: #94a3b8;">R$ ${originalPrice.toFixed(2)}</span></li>
+              <li style="margin-bottom: 12px;"><strong>Desconto de Líder:</strong> <span style="color: #16a34a; font-weight: bold;">-R$ ${discountValue.toFixed(2)}</span></li>
+              <li style="font-size: 18px;"><strong>Valor Final:</strong> <span style="color: #8b5cf6; font-weight: bold;">R$ ${finalPrice.toFixed(2)}</span></li>
+            </div>
+          </ul>
+        </div>
+
+        <p><strong>Importante:</strong> Apresente este comprovante (impresso ou no celular) e um documento com foto no dia do evento.</p>
+        <p style="margin-bottom: 0;">Agradecemos por sua liderança e estamos à disposição para qualquer dúvida.</p>
+      </div>
+    </div>
+  `;
+
+  try {
+    const mailOptions = {
+      from: `"Inscrições" <${process.env.EMAIL_USER || 'isaachonorato41@gmail.com'}>`,
+      to: transaction.buyerEmail,
+      subject: 'Confirmação de Inscrição de Líder',
+      html: htmlContent
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log(`E-mail de confirmação de líder enviado para ${transaction.buyerEmail}`);
+    
+    // Atualiza a transação para evitar envios duplicados
+    transaction.emailSent = true;
+    await transaction.save();
+  } catch (err) {
+    console.error('Erro ao enviar email de líder:', err.message);
+  }
+}
+
+module.exports = { sendConfirmationEmail, sendLeaderConfirmationEmail };

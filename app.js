@@ -2,7 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const path = require('path');
 const crypto = require('crypto');
-const { sendConfirmationEmail } = require("./mailer");
+const { sendConfirmationEmail, sendLeaderConfirmationEmail } = require("./mailer");
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const session = require('express-session');
@@ -347,6 +347,15 @@ app.get('/api/calculate-price', async (req, res) => {
           couponType: 'lider',
           isActive: true
         });
+
+        // Validar se cupom de líder já foi usado (se for singleUse)
+        if (leaderCoupon && leaderCoupon.singleUse && leaderCoupon.usageCount > 0) {
+          return res.json({
+            success: false,
+            error: 'Este cupom de líder já foi utilizado.',
+            couponStatus: 'invalid'
+          });
+        }
       }
     }
 
@@ -447,6 +456,16 @@ app.post('/checkout', requireCsrf, async (req, res) => {
         publicKey: process.env.MERCADO_PAGO_PUBLIC_KEY
       });
     }
+
+    // Verificar se cupom de líder já foi usado (se for singleUse)
+    if (leaderCoupon.singleUse && leaderCoupon.usageCount > 0) {
+      return res.status(400).render('index', {
+        error: 'Este cupom de líder já foi utilizado e não pode ser reutilizado.',
+        message: null,
+        prices: { base: getBaseTicketPrice(), lunch: getLunchAddonPrice() },
+        publicKey: process.env.MERCADO_PAGO_PUBLIC_KEY
+      });
+    }
   }
 
   const subtotalPreview =
@@ -461,9 +480,47 @@ app.post('/checkout', requireCsrf, async (req, res) => {
     resolveCouponDiscountValue(leaderCoupon, singleTicketCap, 1)
   );
   const localPaymentId = crypto.randomUUID();
-  const pixExpirationDate = resolvePixExpirationDate();
 
   try {
+    // Se é cupom de líder, não gera PIX, apenas cria a transação com status "to_confirm"
+    if (leaderCoupon) {
+      const transactionData = {
+        localPaymentId,
+        buyerName,
+        buyerEmail,
+        buyerPhone,
+        paymentMethod: 'leader_confirmation',
+        purchaseType: 'individual',
+        quantityWithoutLunch,
+        quantityWithLunch,
+        totalTickets,
+        baseTicketPrice: getBaseTicketPrice(),
+        lunchAddonPrice: getLunchAddonPrice(),
+        subtotalAmount: amounts.subtotal,
+        caravanDiscountAmount: amounts.caravanDiscountAmount,
+        leaderDiscountAmount: amounts.leaderDiscountAmount,
+        discountAmount: amounts.discountAmount,
+        leaderCouponCode: leaderCoupon.code,
+        couponCode: leaderCoupon.code,
+        amount: amounts.total,
+        status: 'to_confirm',
+        statusDetail: 'awaiting_confirmation',
+        leaderConfirmed: false
+      };
+
+      const createdTx = await Transaction.create(transactionData);
+
+      // Marcar cupom de líder como usado
+      leaderCoupon.usageCount += 1;
+      leaderCoupon.lastUsedAt = new Date();
+      leaderCoupon.lastUsedByPaymentId = localPaymentId;
+      await leaderCoupon.save();
+
+      return res.redirect(`/payment/${localPaymentId}`);
+    }
+
+    // Fluxo normal de PIX para caravana ou sem cupom
+    const pixExpirationDate = resolvePixExpirationDate();
     const webhookUrl = buildWebhookUrl();
 
     const paymentData = {
@@ -533,13 +590,6 @@ app.post('/checkout', requireCsrf, async (req, res) => {
       caravanCoupon.lastUsedAt = new Date();
       caravanCoupon.lastUsedByPaymentId = localPaymentId;
       await caravanCoupon.save();
-    }
-
-    if (leaderCoupon) {
-      leaderCoupon.usageCount += 1;
-      leaderCoupon.lastUsedAt = new Date();
-      leaderCoupon.lastUsedByPaymentId = localPaymentId;
-      await leaderCoupon.save();
     }
 
     return res.redirect(`/payment/${localPaymentId}`);
@@ -692,6 +742,43 @@ app.get('/payments/:localPaymentId/status', async (req, res) => {
     });
   } catch (error) {
     return res.status(500).json({ error: 'Erro ao consultar status.' });
+  }
+});
+
+app.post('/payment/:localPaymentId/confirm-leader', async (req, res) => {
+  try {
+    const tx = await Transaction.findOne({ localPaymentId: req.params.localPaymentId });
+
+    if (!tx) {
+      return res.status(404).json({ error: 'Inscrição não encontrada.' });
+    }
+
+    if (tx.status !== 'to_confirm') {
+      return res.status(400).json({ error: 'Esta inscrição não está aguardando confirmação.' });
+    }
+
+    if (tx.leaderConfirmed) {
+      return res.status(400).json({ error: 'Esta inscrição já foi confirmada.' });
+    }
+
+    // Marcar como confirmado
+    tx.status = 'approved';
+    tx.statusDetail = 'leader_confirmed';
+    tx.leaderConfirmed = true;
+    tx.lastCheckedAt = new Date();
+    await tx.save();
+
+    // Enviar email de confirmação
+    sendLeaderConfirmationEmail(tx);
+
+    return res.json({
+      ok: true,
+      status: tx.status,
+      message: 'Inscrição confirmada com sucesso!'
+    });
+  } catch (error) {
+    console.error('Erro ao confirmar inscrição de líder:', error.message);
+    return res.status(500).json({ error: 'Erro ao confirmar inscrição.' });
   }
 });
 

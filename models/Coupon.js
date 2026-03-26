@@ -29,6 +29,10 @@ const CouponSchema = new mongoose.Schema(
       default: 'caravana',
       index: true
     },
+    singleUse: {
+      type: Boolean,
+      default: false
+    },
     isActive: {
       type: Boolean,
       default: true,

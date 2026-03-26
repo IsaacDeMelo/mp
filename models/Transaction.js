@@ -177,6 +177,14 @@ const TransactionSchema = new mongoose.Schema(
     emailSent: {
       type: Boolean,
       default: false
+    },
+    leaderConfirmed: {
+      type: Boolean,
+      default: false
+    },
+    leaderCouponAlreadyUsed: {
+      type: Boolean,
+      default: false
     }
   },
   {

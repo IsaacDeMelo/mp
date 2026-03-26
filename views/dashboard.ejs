@@ -91,6 +91,7 @@
     }
 
     .status-pending { background: #fff5d6; color: var(--warn); }
+    .status-to_confirm { background: #fce7f3; color: #be123c; }
     .status-approved, .status-authorized { background: #dcfce7; color: var(--ok); }
     .status-rejected, .status-cancelled, .status-expired { background: #ffe4e6; color: var(--bad); }
 
@@ -302,7 +303,7 @@
           <div class="meta-item"><strong>Subtotal</strong><span>R$ <%= Number(currentPayment.subtotalAmount).toFixed(2) %></span></div>
           <div class="meta-item"><strong>Desconto</strong><span>R$ <%= Number(currentPayment.discountAmount || 0).toFixed(2) %></span></div>
           <div class="meta-item"><strong>Total final</strong><span data-total-amount="<%= Number(currentPayment.amount).toFixed(2) %>">R$ <%= Number(currentPayment.amount).toFixed(2) %></span></div>
-          <div class="meta-item"><strong>Método</strong><span><%= currentPayment.paymentMethod === 'card' ? 'cartão' : 'pix' %></span></div>
+          <div class="meta-item"><strong>Método</strong><span><%= currentPayment.paymentMethod === 'card' ? 'cartão' : currentPayment.paymentMethod === 'leader_confirmation' ? 'Inscrição de Líder' : 'pix' %></span></div>
         </div>
 
         <% if (currentPayment.caravanCouponCode || currentPayment.leaderCouponCode) { %>
@@ -365,6 +366,22 @@
           <p class="small">Cartão final <strong><%= currentPayment.cardLastFourDigits %></strong> • Parcelas: <%= currentPayment.installments || 1 %>x</p>
         <% } %>
 
+        <% if (currentPayment.paymentMethod === 'leader_confirmation' && currentPayment.status === 'to_confirm') { %>
+          <div style="background: linear-gradient(165deg, #fef3c7, #fef08a); border: 1px solid #fcd34d; border-radius: 12px; padding: 16px; margin-top: 16px; text-align: center;">
+            <p style="margin: 0 0 12px 0; font-weight: 600; color: #92400e;">Inscrição de Líder Pendente</p>
+            <p class="small" style="margin: 0 0 12px 0;">Clique no botão abaixo para confirmar sua inscrição.</p>
+            <button type="button" id="confirm-leader-btn" class="btn" style="background: #8b5cf6; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 600;">✓ Confirmar Inscrição</button>
+            <p id="confirm-status-msg" class="small" style="margin-top: 8px; display: none;"></p>
+          </div>
+        <% } %>
+
+        <% if (currentPayment.paymentMethod === 'leader_confirmation' && currentPayment.status === 'approved' && currentPayment.leaderConfirmed) { %>
+          <div style="background: linear-gradient(165deg, #dcfce7, #f0fdf4); border: 1px solid #86efac; border-radius: 12px; padding: 16px; margin-top: 16px; text-align: center;">
+            <p style="margin: 0 0 8px 0; font-weight: 600; color: #166534;">✓ Inscrição Confirmada!</p>
+            <p class="small" style="margin: 0;">Sua inscrição de líder foi confirmada. Apresente este comprovante no evento.</p>
+          </div>
+        <% } %>
+
       </aside>
     </section>
   </main>
@@ -405,6 +422,7 @@
 
       function readableStatus(status) {
         if (isApproved(status)) return 'Pagamento concluído!';
+        if (status === 'to_confirm') return 'Inscrição aguardando confirmação';
         if (status === 'pending') return 'Aguardando pagamento';
         if (status === 'rejected') return 'Pagamento recusado';
         if (status === 'cancelled') return 'Pagamento cancelado';
@@ -414,6 +432,7 @@
 
       function statusLabel(status) {
         if (isApproved(status)) return 'aprovado';
+        if (status === 'to_confirm') return 'confirmar';
         if (status === 'pending') return 'aguardando';
         if (status === 'rejected') return 'recusado';
         if (status === 'cancelled') return 'cancelado';
@@ -423,6 +442,7 @@
 
       function readableSubtitle(status) {
         if (isApproved(status)) return 'Parabéns! Seu pagamento foi confirmado com sucesso.';
+        if (status === 'to_confirm') return 'Clique no botão abaixo para confirmar sua inscrição de líder.';
         if (status === 'pending') return 'Assim que o pagamento for confirmado, esta tela atualiza automaticamente.';
         if (status === 'expired') return 'Essa cobrança venceu. Gere uma nova cobrança para continuar.';
         return 'Você pode tentar novamente ou gerar uma nova cobrança.';
@@ -584,6 +604,51 @@
 
       if (pageData.paymentStatus === 'pending') {
         setInterval(pollStatus, 5000);
+      }
+
+      // Confirmar inscrição de líder
+      const confirmLeaderBtn = document.getElementById('confirm-leader-btn');
+      const confirmStatusMsg = document.getElementById('confirm-status-msg');
+      
+      if (confirmLeaderBtn) {
+        confirmLeaderBtn.addEventListener('click', async function() {
+          confirmLeaderBtn.disabled = true;
+          confirmLeaderBtn.textContent = 'Processando...';
+          
+          try {
+            const response = await fetch(`/payment/${paymentId}/confirm-leader`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              }
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+              confirmStatusMsg.textContent = '✓ Inscrição confirmada! Recarregando...';
+              confirmStatusMsg.style.color = '#16a34a';
+              confirmStatusMsg.style.display = 'block';
+              
+              setTimeout(() => {
+                location.reload();
+              }, 2000);
+            } else {
+              confirmStatusMsg.textContent = '✗ Erro: ' + (result.error || 'Falha ao confirmar');
+              confirmStatusMsg.style.color = '#be123c';
+              confirmStatusMsg.style.display = 'block';
+              confirmLeaderBtn.disabled = false;
+              confirmLeaderBtn.textContent = '✓ Confirmar Inscrição';
+            }
+          } catch (error) {
+            console.error('Erro:', error);
+            confirmStatusMsg.textContent = '✗ Erro ao confirmar inscrição';
+            confirmStatusMsg.style.color = '#be123c';
+            confirmStatusMsg.style.display = 'block';
+            confirmLeaderBtn.disabled = false;
+            confirmLeaderBtn.textContent = '✓ Confirmar Inscrição';
+          }
+        });
       }
     })();
   </script>

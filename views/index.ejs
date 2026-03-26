@@ -349,6 +349,21 @@
             font-size: 18px;
         }
 
+        .summary-row.original-price {
+            opacity: 0.7;
+        }
+
+        .summary-row.original-price strong {
+            text-decoration: line-through;
+            color: #999;
+        }
+
+        .summary-row.discount-saving {
+            color: #16a34a;
+            font-weight: 600;
+            margin: 8px 0 4px 0;
+        }
+
         .summary-total {
             margin-top: 12px;
             padding-top: 12px;
@@ -595,6 +610,8 @@
                         <h2>Resumo do pedido</h2>
                         <div class="summary-row"><span>Sem almoço</span><strong id="lineWithout">R$ 1.00</strong></div>
                         <div class="summary-row"><span>Com almoço</span><strong id="lineWith">R$ 0.00</strong></div>
+                        <div class="summary-row original-price" id="subtotalRow" style="display: none;"><span>Subtotal</span><strong id="subtotalOriginal">R$ 0.00</strong></div>
+                        <div class="summary-row discount-saving" id="discountRow" style="display: none;"><span>💚 Desconto aplicado</span><strong id="discountAmount">-R$ 0.00</strong></div>
                         <div class="summary-total"><span>Total estimado</span><span id="total">R$ 1.00</span></div>
                         <p class="muted">O desconto é calculado ao finalizar. Cupom de líder vale só para 1 inscrição da
                             compra.</p>
@@ -630,6 +647,10 @@
             const lineWithout = document.getElementById('lineWithout');
             const lineWith = document.getElementById('lineWith');
             const total = document.getElementById('total');
+            const subtotalRow = document.getElementById('subtotalRow');
+            const discountRow = document.getElementById('discountRow');
+            const subtotalOriginal = document.getElementById('subtotalOriginal');
+            const discountAmount = document.getElementById('discountAmount');
             const couponInput = document.getElementById('couponInput');
             const caravanCouponCodeInput = document.getElementById('caravanCouponCode');
             const leaderCouponCodeInput = document.getElementById('leaderCouponCode');
@@ -782,12 +803,25 @@
                         if (data.success) {
                             const valueWithout = qWithout * base;
                             const valueWith = qWith * (base + lunch);
+                            const subtotal = valueWithout + valueWith;
                             
                             lineWithout.textContent = `R$ ${valueWithout.toFixed(2)}`;
                             lineWith.textContent = `R$ ${valueWith.toFixed(2)}`;
                             
                             if (data.amounts) {
                                 total.textContent = `R$ ${data.amounts.total.toFixed(2)}`;
+                                
+                                // Mostrar desconto se houver
+                                if (data.amounts.discountAmount && data.amounts.discountAmount > 0) {
+                                    subtotalRow.style.display = 'flex';
+                                    subtotalOriginal.textContent = `R$ ${subtotal.toFixed(2)}`;
+                                    
+                                    discountRow.style.display = 'flex';
+                                    discountAmount.textContent = `-R$ ${data.amounts.discountAmount.toFixed(2)}`;
+                                } else {
+                                    subtotalRow.style.display = 'none';
+                                    discountRow.style.display = 'none';
+                                }
                                 
                                 const msgEl = document.getElementById('couponMessage');
                                 if (msgEl) {
