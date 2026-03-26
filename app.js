@@ -836,6 +836,9 @@ app.post('/payment/:localPaymentId/confirm-leader', async (req, res) => {
         return res.status(409).json({ error: 'Este cupom de líder já foi utilizado ou está inativo.' });
       }
 
+      // Remove o cupom após consumo para liberar o mesmo código no futuro.
+      await Coupon.deleteOne({ _id: consumedCoupon._id });
+
       tx.leaderCouponAlreadyUsed = true;
     }
 
