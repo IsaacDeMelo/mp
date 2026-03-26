@@ -173,6 +173,10 @@ const TransactionSchema = new mongoose.Schema(
     lastCheckedAt: {
       type: Date,
       default: null
+    },
+    emailSent: {
+      type: Boolean,
+      default: false
     }
   },
   {

@@ -161,7 +161,9 @@
     }
 
     function rotuloModoDesconto(mode) {
-      return mode === 'percent' ? 'percentual' : 'valor fixo';
+      if (mode === 'percent') return 'percentual';
+      if (mode === 'per_ticket') return 'fixo por inscrição';
+      return 'valor fixo global';
     }
 
     function formatarDesconto(cupom) {
@@ -170,6 +172,9 @@
       const modo = String(cupom.discountMode || 'fixed').trim().toLowerCase();
       if (modo === 'percent') {
         return valor.toFixed(2).toString() + '%';
+      }
+      if (modo === 'per_ticket') {
+        return 'R$ ' + valor.toFixed(2) + ' (por inscrição)';
       }
       return 'R$ ' + valor.toFixed(2);
     }
@@ -248,6 +253,27 @@
       </article>
     </section>
 
+    <section class="panels" style="margin-bottom: 24px;">
+      <div class="panel">
+        <h2>Preços dos Ingressos</h2>
+        <form action="/admin/<%= adminPath %>/settings" method="POST" style="display: flex; gap: 16px; align-items: flex-end; flex-wrap: wrap;">
+          <input type="hidden" name="csrfToken" value="<%= csrfToken %>" />
+          
+          <div class="field" style="margin-bottom: 0; min-width: 140px;">
+            <label>Sem almoço (R$)</label>
+            <input type="number" name="baseTicketPrice" step="0.01" min="0" value="<%= prices.base %>" required />
+          </div>
+
+          <div class="field" style="margin-bottom: 0; min-width: 140px;">
+            <label>Adicional almoço (R$)</label>
+            <input type="number" name="lunchAddonPrice" step="0.01" min="0" value="<%= prices.lunch %>" required />
+          </div>
+
+          <button type="submit" class="btn" style="padding: 10px 24px;">Salvar Preços</button>
+        </form>
+      </div>
+    </section>
+
     <section class="panels">
       <aside class="panel">
         <h2>Novo cupom</h2>
@@ -265,8 +291,9 @@
           <div class="field">
             <label>Modo do desconto</label>
             <select name="discountMode" required>
-              <option value="fixed">Valor fixo (R$)</option>
-              <option value="percent">Percentual (%)</option>
+              <option value="fixed">Valor fixo (R$) único no total</option>
+              <option value="per_ticket" selected>Valor fixo (R$) por cada inscrição</option>
+              <option value="percent">Percentual (%) sobre o subtotal</option>
             </select>
           </div>
 

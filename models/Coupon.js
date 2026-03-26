@@ -18,7 +18,7 @@ const CouponSchema = new mongoose.Schema(
     discountMode: {
       type: String,
       required: true,
-      enum: ['fixed', 'percent'],
+      enum: ['fixed', 'percent', 'per_ticket'],
       default: 'fixed',
       index: true
     },

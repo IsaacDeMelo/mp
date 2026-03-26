@@ -17,6 +17,14 @@ const AdminSettingSchema = new mongoose.Schema(
     passwordHash: {
       type: String,
       required: true
+    },
+    baseTicketPrice: {
+      type: Number,
+      default: 65
+    },
+    lunchAddonPrice: {
+      type: Number,
+      default: 20
     }
   },
   {

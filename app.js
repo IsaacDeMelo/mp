@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const path = require('path');
 const crypto = require('crypto');
+const { sendConfirmationEmail } = require("./mailer");
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const session = require('express-session');
@@ -19,8 +20,8 @@ const PORT = Number(process.env.PORT || 3000);
 const MONGODB_URI = process.env.MONGODB_URI || process.env.MONGO_URI;
 const MongoStore = connectMongo.default || connectMongo;
 
-const BASE_TICKET_PRICE = 60;
-const LUNCH_ADDON_PRICE = 20;
+function getBaseTicketPrice() { return adminConfigCache?.baseTicketPrice ?? 65; }
+function getLunchAddonPrice() { return adminConfigCache?.lunchAddonPrice ?? 20; }
 const MIN_PIX_EXPIRATION_HOURS = 24;
 
 const REQUIRED_ENV = ['MERCADO_PAGO_ACCESS_TOKEN', 'SESSION_SECRET', 'ADMIN_PASSWORD'];
@@ -90,13 +91,13 @@ function parseQty(value) {
 
 function getSingleTicketCap(quantityWithoutLunch, quantityWithLunch) {
   return quantityWithLunch > 0
-    ? BASE_TICKET_PRICE + LUNCH_ADDON_PRICE
+    ? getBaseTicketPrice() + getLunchAddonPrice()
     : quantityWithoutLunch > 0
-      ? BASE_TICKET_PRICE
+      ? getBaseTicketPrice()
       : 0;
 }
 
-function resolveCouponDiscountValue(coupon, referenceAmount) {
+function resolveCouponDiscountValue(coupon, referenceAmount, totalQty = 1) {
   if (!coupon || !Number.isFinite(referenceAmount) || referenceAmount <= 0) {
     return 0;
   }
@@ -110,14 +111,18 @@ function resolveCouponDiscountValue(coupon, referenceAmount) {
   if (mode === 'percent') {
     return Number((referenceAmount * (rawAmount / 100)).toFixed(2));
   }
+  
+  if (mode === 'per_ticket') {
+    return Number((rawAmount * totalQty).toFixed(2));
+  }
 
   return rawAmount;
 }
 
 function calcAmounts(quantityWithoutLunch, quantityWithLunch, caravanDiscountValue, leaderDiscountValue) {
   const subtotal =
-    quantityWithoutLunch * BASE_TICKET_PRICE +
-    quantityWithLunch * (BASE_TICKET_PRICE + LUNCH_ADDON_PRICE);
+    quantityWithoutLunch * getBaseTicketPrice() +
+    quantityWithLunch * (getBaseTicketPrice() + getLunchAddonPrice());
 
   const maxDiscount = Math.max(0, subtotal - 0.01);
   const singleTicketCap = getSingleTicketCap(quantityWithoutLunch, quantityWithLunch);
@@ -170,6 +175,10 @@ async function refreshPaymentStatus(localPaymentId) {
   tx.statusDetail = mpPayment?.body?.status_detail || tx.statusDetail;
   tx.lastCheckedAt = new Date();
   await tx.save();
+
+  if (tx.status === 'approved' && !tx.emailSent) {
+    sendConfirmationEmail(tx); // não damos await para não travar
+  }
 
   return tx;
 }
@@ -310,8 +319,8 @@ app.get('/', (req, res) => {
     error,
     message: null,
     prices: {
-      base: BASE_TICKET_PRICE,
-      lunch: LUNCH_ADDON_PRICE
+      base: getBaseTicketPrice(),
+      lunch: getLunchAddonPrice()
     },
     publicKey: process.env.MERCADO_PAGO_PUBLIC_KEY
   });
@@ -342,15 +351,17 @@ app.get('/api/calculate-price', async (req, res) => {
     }
 
     const subtotalPreview =
-      quantityWithoutLunch * BASE_TICKET_PRICE +
-      quantityWithLunch * (BASE_TICKET_PRICE + LUNCH_ADDON_PRICE);
+      quantityWithoutLunch * getBaseTicketPrice() +
+      quantityWithLunch * (getBaseTicketPrice() + getLunchAddonPrice());
     const singleTicketCap = getSingleTicketCap(quantityWithoutLunch, quantityWithLunch);
+
+    const totalQty = quantityWithoutLunch + quantityWithLunch;
 
     const amounts = calcAmounts(
       quantityWithoutLunch,
       quantityWithLunch,
-      resolveCouponDiscountValue(caravanCoupon, subtotalPreview),
-      resolveCouponDiscountValue(leaderCoupon, singleTicketCap)
+      resolveCouponDiscountValue(caravanCoupon, subtotalPreview, totalQty),
+      resolveCouponDiscountValue(leaderCoupon, singleTicketCap, 1)
     );
 
     res.json({
@@ -378,7 +389,7 @@ app.post('/checkout', requireCsrf, async (req, res) => {
     return res.status(400).render('index', {
       error: 'Informe nome e e-mail para a inscrição.',
       message: null,
-      prices: { base: BASE_TICKET_PRICE, lunch: LUNCH_ADDON_PRICE },
+      prices: { base: getBaseTicketPrice(), lunch: getLunchAddonPrice() },
       publicKey: process.env.MERCADO_PAGO_PUBLIC_KEY
     });
   }
@@ -387,7 +398,7 @@ app.post('/checkout', requireCsrf, async (req, res) => {
     return res.status(400).render('index', {
       error: 'Informe ao menos 1 ingresso.',
       message: null,
-      prices: { base: BASE_TICKET_PRICE, lunch: LUNCH_ADDON_PRICE },
+      prices: { base: getBaseTicketPrice(), lunch: getLunchAddonPrice() },
       publicKey: process.env.MERCADO_PAGO_PUBLIC_KEY
     });
   }
@@ -396,7 +407,7 @@ app.post('/checkout', requireCsrf, async (req, res) => {
     return res.status(400).render('index', {
       error: 'Use apenas 1 cupom por compra. Não é possível combinar cupom de caravana e de líder.',
       message: null,
-      prices: { base: BASE_TICKET_PRICE, lunch: LUNCH_ADDON_PRICE },
+      prices: { base: getBaseTicketPrice(), lunch: getLunchAddonPrice() },
       publicKey: process.env.MERCADO_PAGO_PUBLIC_KEY
     });
   }
@@ -415,7 +426,7 @@ app.post('/checkout', requireCsrf, async (req, res) => {
       return res.status(400).render('index', {
         error: 'Cupom de caravana inválido.',
         message: null,
-        prices: { base: BASE_TICKET_PRICE, lunch: LUNCH_ADDON_PRICE },
+        prices: { base: getBaseTicketPrice(), lunch: getLunchAddonPrice() },
         publicKey: process.env.MERCADO_PAGO_PUBLIC_KEY
       });
     }
@@ -432,22 +443,22 @@ app.post('/checkout', requireCsrf, async (req, res) => {
       return res.status(400).render('index', {
         error: 'Cupom de líder inválido.',
         message: null,
-        prices: { base: BASE_TICKET_PRICE, lunch: LUNCH_ADDON_PRICE },
+        prices: { base: getBaseTicketPrice(), lunch: getLunchAddonPrice() },
         publicKey: process.env.MERCADO_PAGO_PUBLIC_KEY
       });
     }
   }
 
   const subtotalPreview =
-    quantityWithoutLunch * BASE_TICKET_PRICE +
-    quantityWithLunch * (BASE_TICKET_PRICE + LUNCH_ADDON_PRICE);
+    quantityWithoutLunch * getBaseTicketPrice() +
+    quantityWithLunch * (getBaseTicketPrice() + getLunchAddonPrice());
   const singleTicketCap = getSingleTicketCap(quantityWithoutLunch, quantityWithLunch);
 
   const amounts = calcAmounts(
     quantityWithoutLunch,
     quantityWithLunch,
-    resolveCouponDiscountValue(caravanCoupon, subtotalPreview),
-    resolveCouponDiscountValue(leaderCoupon, singleTicketCap)
+    resolveCouponDiscountValue(caravanCoupon, subtotalPreview, totalTickets),
+    resolveCouponDiscountValue(leaderCoupon, singleTicketCap, 1)
   );
   const localPaymentId = crypto.randomUUID();
   const pixExpirationDate = resolvePixExpirationDate();
@@ -496,8 +507,8 @@ app.post('/checkout', requireCsrf, async (req, res) => {
       quantityWithoutLunch,
       quantityWithLunch,
       totalTickets,
-      baseTicketPrice: BASE_TICKET_PRICE,
-      lunchAddonPrice: LUNCH_ADDON_PRICE,
+      baseTicketPrice: getBaseTicketPrice(),
+      lunchAddonPrice: getLunchAddonPrice(),
       subtotalAmount: amounts.subtotal,
       caravanDiscountAmount: amounts.caravanDiscountAmount,
       leaderDiscountAmount: amounts.leaderDiscountAmount,
@@ -543,7 +554,7 @@ app.post('/checkout', requireCsrf, async (req, res) => {
     return res.status(500).render('index', {
       error: `Falha ao criar cobrança PIX: ${apiMessage}`,
       message: null,
-      prices: { base: BASE_TICKET_PRICE, lunch: LUNCH_ADDON_PRICE },
+      prices: { base: getBaseTicketPrice(), lunch: getLunchAddonPrice() },
       publicKey: process.env.MERCADO_PAGO_PUBLIC_KEY
     });
   }
@@ -652,8 +663,8 @@ app.get('/payment/:localPaymentId', async (req, res) => {
   return res.render('dashboard', {
     currentPayment: freshTx,
     prices: {
-      base: BASE_TICKET_PRICE,
-      lunch: LUNCH_ADDON_PRICE
+      base: getBaseTicketPrice(),
+      lunch: getLunchAddonPrice()
     },
     publicKey: process.env.MERCADO_PAGO_PUBLIC_KEY
   });
@@ -720,6 +731,10 @@ app.post('/webhook/mercadopago', async (req, res) => {
     tx.lastCheckedAt = new Date();
     await tx.save();
 
+    if (tx.status === 'approved' && !tx.emailSent) {
+      sendConfirmationEmail(tx); // não damos await para não travar o webhook
+    }
+
     return res.status(200).send('ok');
   } catch (error) {
     return res.status(200).send('ok');
@@ -771,9 +786,29 @@ app.get('/admin/:slug/dashboard', requireAdminSlug, requireAdminAuth, async (req
     transactions,
     coupons,
     stats,
+    prices: { base: getBaseTicketPrice(), lunch: getLunchAddonPrice() },
     error: null,
     message: null
   });
+});
+
+app.post('/admin/:slug/settings', requireAdminSlug, requireAdminAuth, requireCsrf, async (req, res) => {
+  const basePrice = Number(req.body.baseTicketPrice);
+  const lunchPrice = Number(req.body.lunchAddonPrice);
+
+  if (!Number.isFinite(basePrice) || basePrice < 0 || !Number.isFinite(lunchPrice) || lunchPrice < 0) {
+    return res.redirect(`/admin/${req.params.slug}/dashboard`);
+  }
+
+  const existing = await AdminSetting.findOne({ key: 'main' });
+  if (existing) {
+    existing.baseTicketPrice = basePrice;
+    existing.lunchAddonPrice = lunchPrice;
+    await existing.save();
+    adminConfigCache = existing;
+  }
+
+  res.redirect(`/admin/${req.params.slug}/dashboard`);
 });
 
 app.post('/admin/:slug/coupons', requireAdminSlug, requireAdminAuth, requireCsrf, async (req, res) => {
@@ -782,7 +817,7 @@ app.post('/admin/:slug/coupons', requireAdminSlug, requireAdminAuth, requireCsrf
   const discountMode = String(req.body.discountMode || 'fixed').trim().toLowerCase();
   const couponType = String(req.body.couponType || '').trim().toLowerCase();
 
-  const isDiscountModeValid = ['fixed', 'percent'].includes(discountMode);
+  const isDiscountModeValid = ['fixed', 'percent', 'per_ticket'].includes(discountMode);
   const isDiscountAmountValid = Number.isFinite(discountAmount) && discountAmount > 0;
   const isPercentInRange = discountMode !== 'percent' || discountAmount <= 100;
 
@@ -799,6 +834,7 @@ app.post('/admin/:slug/coupons', requireAdminSlug, requireAdminAuth, requireCsrf
         pendingOrders: transactions.filter((item) => item.status === 'pending' || item.status === 'awaiting_card').length,
         revenue: transactions.filter((item) => item.status === 'approved').reduce((sum, item) => sum + Number(item.amount || 0), 0)
       },
+      prices: { base: getBaseTicketPrice(), lunch: getLunchAddonPrice() },
       error: 'Cupom inválido. Informe tipo, código e desconto válido (percentual até 100%).',
       message: null
     });
@@ -818,6 +854,7 @@ app.post('/admin/:slug/coupons', requireAdminSlug, requireAdminAuth, requireCsrf
         pendingOrders: transactions.filter((item) => item.status === 'pending' || item.status === 'awaiting_card').length,
         revenue: transactions.filter((item) => item.status === 'approved').reduce((sum, item) => sum + Number(item.amount || 0), 0)
       },
+      prices: { base: getBaseTicketPrice(), lunch: getLunchAddonPrice() },
       error: 'Esse cupom já existe.',
       message: null
     });
