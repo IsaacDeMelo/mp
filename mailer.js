@@ -62,7 +62,7 @@ async function sendConfirmationEmail(transaction) {
 
   try {
     const mailOptions = {
-      from: \`"Inscrições" <\${process.env.EMAIL_USER || 'isaachonorato41@gmail.com'}>\`,
+      from: `"Inscrições" <${process.env.EMAIL_USER || 'isaachonorato41@gmail.com'}>`,
       to: transaction.buyerEmail,
       subject: 'Confirmação de Inscrição - Pedido Aprovado',
       html: htmlContent
