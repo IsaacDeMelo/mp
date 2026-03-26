@@ -616,10 +616,10 @@
                         <p class="muted">O desconto é calculado ao finalizar. Cupom de líder vale só para 1 inscrição da
                             compra.</p>
 
-                        <input type="hidden" name="paymentMethod" value="pix" />
-                        <p class="muted">Pagamento disponível no momento: PIX.</p>
+                        <input type="hidden" name="paymentMethod" id="paymentMethod" value="pix" />
+                        <p class="muted" id="paymentInfo">Pagamento disponível no momento: PIX.</p>
 
-                        <button class="checkout-submit" type="submit">Gerar PIX</button>
+                        <button class="checkout-submit" id="checkoutSubmitBtn" type="submit">Gerar PIX</button>
                     </aside>
                 </form>
     </main>
@@ -652,6 +652,9 @@
             const subtotalOriginal = document.getElementById('subtotalOriginal');
             const discountAmount = document.getElementById('discountAmount');
             const couponInput = document.getElementById('couponInput');
+            const paymentMethodInput = document.getElementById('paymentMethod');
+            const paymentInfo = document.getElementById('paymentInfo');
+            const checkoutSubmitBtn = document.getElementById('checkoutSubmitBtn');
             const caravanCouponCodeInput = document.getElementById('caravanCouponCode');
             const leaderCouponCodeInput = document.getElementById('leaderCouponCode');
             const pendingBox = document.getElementById('session-payment');
@@ -691,6 +694,24 @@
             function safeInt(v) {
                 const n = Number(v);
                 return Number.isInteger(n) && n > 0 ? n : 0;
+            }
+
+            function updateCheckoutAction(totalValue) {
+                const isFree = Number(totalValue) <= 0;
+
+                if (checkoutSubmitBtn) {
+                    checkoutSubmitBtn.textContent = isFree ? 'Confirmar inscrição' : 'Gerar PIX';
+                }
+
+                if (paymentInfo) {
+                    paymentInfo.textContent = isFree
+                        ? 'Inscrição sem pagamento: confirme para finalizar.'
+                        : 'Pagamento disponível no momento: PIX.';
+                }
+
+                if (paymentMethodInput) {
+                    paymentMethodInput.value = isFree ? 'leader_confirmation' : 'pix';
+                }
             }
 
             function formatarDataBrasilia(data) {
@@ -810,6 +831,7 @@
                             
                             if (data.amounts) {
                                 total.textContent = `R$ ${data.amounts.total.toFixed(2)}`;
+                                updateCheckoutAction(data.amounts.total);
                                 
                                 // Mostrar desconto se houver
                                 if (data.amounts.discountAmount && data.amounts.discountAmount > 0) {
@@ -859,6 +881,7 @@
                 lineWithout.textContent = `R$ ${valueWithout.toFixed(2)}`;
                 lineWith.textContent = `R$ ${valueWith.toFixed(2)}`;
                 total.textContent = `R$ ${grandTotal.toFixed(2)}`;
+                updateCheckoutAction(grandTotal);
                 
                 clearTimeout(debounceTimer);
                 debounceTimer = setTimeout(apiRender, 300);
