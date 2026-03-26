@@ -345,7 +345,19 @@ app.post('/payments/create', requireAuth, requireCsrf, async (req, res) => {
       paymentData.notification_url = webhookUrl;
     }
 
-    const payment = await mercadopago.payment.create(paymentData);
+    let payment;
+    try {
+      payment = await mercadopago.payment.create(paymentData);
+    } catch (createError) {
+      if (paymentData.notification_url) {
+        console.warn('Falha ao criar pagamento com webhook. Tentando sem webhook...', createError.message);
+        delete paymentData.notification_url;
+        payment = await mercadopago.payment.create(paymentData);
+      } else {
+        throw createError;
+      }
+    }
+
     const txData = payment.body?.point_of_interaction?.transaction_data || {};
 
     await Transaction.create({

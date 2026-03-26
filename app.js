@@ -317,6 +317,52 @@ app.get('/', (req, res) => {
   });
 });
 
+app.get('/api/calculate-price', async (req, res) => {
+  try {
+    const quantityWithoutLunch = parseQty(req.query.quantityWithoutLunch);
+    const quantityWithLunch = parseQty(req.query.quantityWithLunch);
+    const couponInput = String(req.query.couponCode || '').trim().toLowerCase();
+
+    let caravanCoupon = null;
+    let leaderCoupon = null;
+
+    if (couponInput) {
+      caravanCoupon = await Coupon.findOne({
+        code: couponInput,
+        couponType: 'caravana',
+        isActive: true
+      });
+      if (!caravanCoupon) {
+        leaderCoupon = await Coupon.findOne({
+          code: couponInput,
+          couponType: 'lider',
+          isActive: true
+        });
+      }
+    }
+
+    const subtotalPreview =
+      quantityWithoutLunch * BASE_TICKET_PRICE +
+      quantityWithLunch * (BASE_TICKET_PRICE + LUNCH_ADDON_PRICE);
+    const singleTicketCap = getSingleTicketCap(quantityWithoutLunch, quantityWithLunch);
+
+    const amounts = calcAmounts(
+      quantityWithoutLunch,
+      quantityWithLunch,
+      resolveCouponDiscountValue(caravanCoupon, subtotalPreview),
+      resolveCouponDiscountValue(leaderCoupon, singleTicketCap)
+    );
+
+    res.json({
+      success: true,
+      amounts,
+      couponStatus: couponInput ? (caravanCoupon || leaderCoupon ? 'valid' : 'invalid') : 'none'
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Erro ao calcular' });
+  }
+});
+
 app.post('/checkout', requireCsrf, async (req, res) => {
   const buyerName = String(req.body.buyerName || '').trim();
   const buyerEmail = String(req.body.buyerEmail || '').trim().toLowerCase();
@@ -425,7 +471,19 @@ app.post('/checkout', requireCsrf, async (req, res) => {
       paymentData.notification_url = webhookUrl;
     }
 
-    const payment = await mercadopago.payment.create(paymentData);
+    let payment;
+    try {
+      payment = await mercadopago.payment.create(paymentData);
+    } catch (createError) {
+      if (paymentData.notification_url) {
+        console.warn('Falha ao criar pagamento com webhook. Tentando sem webhook...', createError.message);
+        delete paymentData.notification_url;
+        payment = await mercadopago.payment.create(paymentData);
+      } else {
+        throw createError;
+      }
+    }
+
     const txData = payment.body?.point_of_interaction?.transaction_data || {};
 
     await Transaction.create({
@@ -538,7 +596,18 @@ app.post('/payments/:localPaymentId/card', async (req, res) => {
       paymentData.notification_url = webhookUrl;
     }
 
-    const payment = await mercadopago.payment.create(paymentData);
+    let payment;
+    try {
+      payment = await mercadopago.payment.create(paymentData);
+    } catch (createError) {
+      if (paymentData.notification_url) {
+        console.warn('Falha ao criar pagamento com webhook. Tentando sem webhook...', createError.message);
+        delete paymentData.notification_url;
+        payment = await mercadopago.payment.create(paymentData);
+      } else {
+        throw createError;
+      }
+    }
 
     tx.status = mapMpStatus(payment.body?.status);
     tx.statusDetail = payment.body?.status_detail || null;
