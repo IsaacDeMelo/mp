@@ -816,58 +816,74 @@
                 const qWithout = safeInt(qtyWithout.value);
                 const qWith = safeInt(qtyWith.value);
                 const coupon = couponInput ? couponInput.value.trim() : '';
+                const msgEl = document.getElementById('couponMessage');
 
                 try {
                     const response = await fetch(`/api/calculate-price?quantityWithoutLunch=${qWithout}&quantityWithLunch=${qWith}&couponCode=${encodeURIComponent(coupon)}`);
-                    if (response.ok) {
-                        const data = await response.json();
-                        if (data.success) {
-                            const valueWithout = qWithout * base;
-                            const valueWith = qWith * (base + lunch);
-                            const subtotal = valueWithout + valueWith;
-                            
-                            lineWithout.textContent = `R$ ${valueWithout.toFixed(2)}`;
-                            lineWith.textContent = `R$ ${valueWith.toFixed(2)}`;
-                            
-                            if (data.amounts) {
-                                total.textContent = `R$ ${data.amounts.total.toFixed(2)}`;
-                                updateCheckoutAction(data.amounts.total);
-                                
-                                // Mostrar desconto se houver
-                                if (data.amounts.discountAmount && data.amounts.discountAmount > 0) {
-                                    subtotalRow.style.display = 'flex';
-                                    subtotalOriginal.textContent = `R$ ${subtotal.toFixed(2)}`;
-                                    
-                                    discountRow.style.display = 'flex';
-                                    discountAmount.textContent = `-R$ ${data.amounts.discountAmount.toFixed(2)}`;
+                    if (!response.ok) {
+                        if (msgEl) {
+                            msgEl.style.color = 'red';
+                            msgEl.textContent = 'Não foi possível validar o cupom agora.';
+                        }
+                        return;
+                    }
+
+                    const data = await response.json();
+                    const valueWithout = qWithout * base;
+                    const valueWith = qWith * (base + lunch);
+                    const subtotal = valueWithout + valueWith;
+
+                    lineWithout.textContent = `R$ ${valueWithout.toFixed(2)}`;
+                    lineWith.textContent = `R$ ${valueWith.toFixed(2)}`;
+
+                    if (!data.success) {
+                        if (msgEl) {
+                            msgEl.style.color = 'red';
+                            msgEl.textContent = data.error || 'Cupom inválido ou expirado.';
+                        }
+                        return;
+                    }
+
+                    if (data.amounts) {
+                        total.textContent = `R$ ${data.amounts.total.toFixed(2)}`;
+                        updateCheckoutAction(data.amounts.total);
+
+                        // Mostrar desconto se houver
+                        if (data.amounts.discountAmount && data.amounts.discountAmount > 0) {
+                            subtotalRow.style.display = 'flex';
+                            subtotalOriginal.textContent = `R$ ${subtotal.toFixed(2)}`;
+
+                            discountRow.style.display = 'flex';
+                            discountAmount.textContent = `-R$ ${data.amounts.discountAmount.toFixed(2)}`;
+                        } else {
+                            subtotalRow.style.display = 'none';
+                            discountRow.style.display = 'none';
+                        }
+
+                        if (msgEl) {
+                            if (data.couponStatus === 'valid') {
+                                let discount = data.amounts.discountAmount;
+                                if (discount > 0) {
+                                    msgEl.style.color = 'green';
+                                    msgEl.textContent = `Cupom aplicado! Desconto de R$ ${discount.toFixed(2)}`;
                                 } else {
-                                    subtotalRow.style.display = 'none';
-                                    discountRow.style.display = 'none';
+                                    msgEl.style.color = '#4a4a4a';
+                                    msgEl.textContent = 'Cupom válido, mas sem desconto aplicável.';
                                 }
-                                
-                                const msgEl = document.getElementById('couponMessage');
-                                if (msgEl) {
-                                    if (data.couponStatus === 'valid') {
-                                        let discount = data.amounts.discountAmount;
-                                        if (discount > 0) {
-                                            msgEl.style.color = 'green';
-                                            msgEl.textContent = `Cupom aplicado! Desconto de R$ ${discount.toFixed(2)}`;
-                                        } else {
-                                            msgEl.style.color = '#4a4a4a';
-                                            msgEl.textContent = 'Cupom válido, mas sem desconto aplicável.';
-                                        }
-                                    } else if (data.couponStatus === 'invalid') {
-                                        msgEl.style.color = 'red';
-                                        msgEl.textContent = 'Cupom inválido ou expirado.';
-                                    } else {
-                                        msgEl.textContent = '';
-                                    }
-                                }
+                            } else if (data.couponStatus === 'invalid') {
+                                msgEl.style.color = 'red';
+                                msgEl.textContent = data.error || 'Cupom inválido ou expirado.';
+                            } else {
+                                msgEl.textContent = '';
                             }
                         }
                     }
                 } catch (e) {
                     console.error('Erro ao calcular subtotal', e);
+                    if (msgEl) {
+                        msgEl.style.color = 'red';
+                        msgEl.textContent = 'Erro de conexão ao validar cupom.';
+                    }
                 }
             }
 
@@ -891,6 +907,7 @@
                 const applyBtn = document.getElementById('applyCouponBtn');
                 if (applyBtn) {
                     applyBtn.addEventListener('click', () => {
+                        routeCoupon(couponInput.value);
                         apiRender();
                     });
                 }
