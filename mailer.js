@@ -13,8 +13,9 @@ const transporter = nodemailer.createTransport({
 });
 
 function formatData(date) {
-  if (!date) return new Date().toLocaleString('pt-BR');
-  return new Date(date).toLocaleString('pt-BR');
+  const options = { timeZone: 'America/Sao_Paulo' };
+  if (!date) return new Date().toLocaleString('pt-BR', options);
+  return new Date(date).toLocaleString('pt-BR', options);
 }
 
 async function sendConfirmationEmail(transaction) {
