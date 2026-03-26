@@ -1,9 +1,13 @@
 const nodemailer = require('nodemailer');
+// Força o Node.js a priorizar IPv4 para evitar o erro ENETUNREACH no Render com IPv6
+require('node:dns').setDefaultResultOrder('ipv4first');
 
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  host: 'smtp.gmail.com',
+  port: 465,
+  secure: true,
   auth: {
-    user: process.env.EMAIL_USER || 'isaachonorato41@gmail.com',
+    user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS
   }
 });
