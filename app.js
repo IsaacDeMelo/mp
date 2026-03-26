@@ -124,7 +124,8 @@ function calcAmounts(quantityWithoutLunch, quantityWithLunch, caravanDiscountVal
     quantityWithoutLunch * getBaseTicketPrice() +
     quantityWithLunch * (getBaseTicketPrice() + getLunchAddonPrice());
 
-  const maxDiscount = Math.max(0, subtotal - 0.01);
+  const roundedSubtotal = Number(subtotal.toFixed(2));
+  const maxDiscount = Math.max(0, roundedSubtotal);
   const singleTicketCap = getSingleTicketCap(quantityWithoutLunch, quantityWithLunch);
 
   const caravanDiscountAmount = Math.max(caravanDiscountValue || 0, 0);
@@ -139,10 +140,10 @@ function calcAmounts(quantityWithoutLunch, quantityWithLunch, caravanDiscountVal
     adjustedLeaderDiscount = Math.max(0, leaderDiscountAmount - overflow);
   }
 
-  const total = Number((subtotal - discountAmount).toFixed(2));
+  const total = Math.max(0, Number((roundedSubtotal - discountAmount).toFixed(2)));
 
   return {
-    subtotal: Number(subtotal.toFixed(2)),
+    subtotal: roundedSubtotal,
     caravanDiscountAmount: Number(adjustedCaravanDiscount.toFixed(2)),
     leaderDiscountAmount: Number(adjustedLeaderDiscount.toFixed(2)),
     discountAmount: Number(discountAmount.toFixed(2)),
@@ -510,11 +511,49 @@ app.post('/checkout', requireCsrf, async (req, res) => {
 
       const createdTx = await Transaction.create(transactionData);
 
-      // Marcar cupom de líder como usado
-      leaderCoupon.usageCount += 1;
-      leaderCoupon.lastUsedAt = new Date();
-      leaderCoupon.lastUsedByPaymentId = localPaymentId;
-      await leaderCoupon.save();
+      return res.redirect(`/payment/${localPaymentId}`);
+    }
+
+    // Quando o desconto cobre 100%, não cria PIX e aguarda confirmação manual.
+    if (amounts.total <= 0) {
+      const createdTx = await Transaction.create({
+        localPaymentId,
+        buyerName,
+        buyerEmail,
+        buyerPhone,
+        paymentMethod: 'leader_confirmation',
+        purchaseType: couponBadgeType(caravanCoupon),
+        quantityWithoutLunch,
+        quantityWithLunch,
+        totalTickets,
+        baseTicketPrice: getBaseTicketPrice(),
+        lunchAddonPrice: getLunchAddonPrice(),
+        subtotalAmount: amounts.subtotal,
+        caravanDiscountAmount: amounts.caravanDiscountAmount,
+        leaderDiscountAmount: amounts.leaderDiscountAmount,
+        discountAmount: amounts.discountAmount,
+        caravanCouponCode: caravanCoupon?.code || null,
+        leaderCouponCode: leaderCoupon?.code || null,
+        couponCode: caravanCoupon?.code || leaderCoupon?.code || null,
+        amount: 0,
+        status: 'to_confirm',
+        statusDetail: 'full_discount_pending_confirmation',
+        mpPaymentId: null,
+        externalReference: localPaymentId,
+        qrCode: null,
+        qrCodeBase64: null,
+        ticketUrl: null,
+        expiresAt: null,
+        lastCheckedAt: null,
+        leaderConfirmed: false
+      });
+
+      if (caravanCoupon) {
+        caravanCoupon.usageCount += 1;
+        caravanCoupon.lastUsedAt = new Date();
+        caravanCoupon.lastUsedByPaymentId = localPaymentId;
+        await caravanCoupon.save();
+      }
 
       return res.redirect(`/payment/${localPaymentId}`);
     }
@@ -761,15 +800,47 @@ app.post('/payment/:localPaymentId/confirm-leader', async (req, res) => {
       return res.status(400).json({ error: 'Esta inscrição já foi confirmada.' });
     }
 
+    // Cupom de líder passa a ser consumido somente na confirmação.
+    if (tx.leaderCouponCode) {
+      const consumedCoupon = await Coupon.findOneAndUpdate(
+        {
+          code: tx.leaderCouponCode,
+          couponType: 'lider',
+          isActive: true,
+          $or: [{ singleUse: false }, { usageCount: 0 }]
+        },
+        {
+          $inc: { usageCount: 1 },
+          $set: {
+            lastUsedAt: new Date(),
+            lastUsedByPaymentId: tx.localPaymentId
+          }
+        },
+        { new: true }
+      );
+
+      if (!consumedCoupon) {
+        return res.status(409).json({ error: 'Este cupom de líder já foi utilizado ou está inativo.' });
+      }
+
+      tx.leaderCouponAlreadyUsed = true;
+    }
+
     // Marcar como confirmado
     tx.status = 'approved';
-    tx.statusDetail = 'leader_confirmed';
+    tx.statusDetail = tx.statusDetail === 'full_discount_pending_confirmation'
+      ? 'full_discount_confirmed'
+      : 'leader_confirmed';
     tx.leaderConfirmed = true;
     tx.lastCheckedAt = new Date();
     await tx.save();
 
-    // Enviar email de confirmação
-    sendLeaderConfirmationEmail(tx);
+    // Enviar email de confirmação adequado ao tipo da inscrição.
+    if (tx.leaderCouponCode) {
+      sendLeaderConfirmationEmail(tx);
+    } else {
+      sendConfirmationEmail(tx);
+    }
 
     return res.json({
       ok: true,

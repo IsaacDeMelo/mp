@@ -36,7 +36,7 @@ const TransactionSchema = new mongoose.Schema(
     paymentMethod: {
       type: String,
       required: true,
-      enum: ['pix', 'card'],
+      enum: ['pix', 'card', 'leader_confirmation'],
       default: 'pix',
       index: true
     },
@@ -119,7 +119,7 @@ const TransactionSchema = new mongoose.Schema(
     amount: {
       type: Number,
       required: true,
-      min: 0.01
+      min: 0
     },
     status: {
       type: String,

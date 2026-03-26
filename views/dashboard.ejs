@@ -303,7 +303,7 @@
           <div class="meta-item"><strong>Subtotal</strong><span>R$ <%= Number(currentPayment.subtotalAmount).toFixed(2) %></span></div>
           <div class="meta-item"><strong>Desconto</strong><span>R$ <%= Number(currentPayment.discountAmount || 0).toFixed(2) %></span></div>
           <div class="meta-item"><strong>Total final</strong><span data-total-amount="<%= Number(currentPayment.amount).toFixed(2) %>">R$ <%= Number(currentPayment.amount).toFixed(2) %></span></div>
-          <div class="meta-item"><strong>Método</strong><span><%= currentPayment.paymentMethod === 'card' ? 'cartão' : currentPayment.paymentMethod === 'leader_confirmation' ? 'Inscrição de Líder' : 'pix' %></span></div>
+          <div class="meta-item"><strong>Método</strong><span><%= currentPayment.paymentMethod === 'card' ? 'cartão' : currentPayment.paymentMethod === 'leader_confirmation' ? (String(currentPayment.statusDetail || '').startsWith('full_discount_') ? 'Confirmação sem pagamento' : 'Inscrição de Líder') : 'pix' %></span></div>
         </div>
 
         <% if (currentPayment.caravanCouponCode || currentPayment.leaderCouponCode) { %>
@@ -368,9 +368,9 @@
 
         <% if (currentPayment.paymentMethod === 'leader_confirmation' && currentPayment.status === 'to_confirm') { %>
           <div style="background: linear-gradient(165deg, #fef3c7, #fef08a); border: 1px solid #fcd34d; border-radius: 12px; padding: 16px; margin-top: 16px; text-align: center;">
-            <p style="margin: 0 0 12px 0; font-weight: 600; color: #92400e;">Inscrição de Líder Pendente</p>
+            <p style="margin: 0 0 12px 0; font-weight: 600; color: #92400e;"><%= String(currentPayment.statusDetail || '').startsWith('full_discount_') ? 'Inscrição sem pagamento' : 'Inscrição de Líder Pendente' %></p>
             <p class="small" style="margin: 0 0 12px 0;">Clique no botão abaixo para confirmar sua inscrição.</p>
-            <button type="button" id="confirm-leader-btn" class="btn" style="background: #8b5cf6; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 600;">✓ Confirmar Inscrição</button>
+            <button type="button" id="confirm-leader-btn" class="btn" style="background: #8b5cf6; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 600;">Confirmar inscrição</button>
             <p id="confirm-status-msg" class="small" style="margin-top: 8px; display: none;"></p>
           </div>
         <% } %>
@@ -606,7 +606,7 @@
         setInterval(pollStatus, 5000);
       }
 
-      // Confirmar inscrição de líder
+      // Confirmar inscrição sem pagamento
       const confirmLeaderBtn = document.getElementById('confirm-leader-btn');
       const confirmStatusMsg = document.getElementById('confirm-status-msg');
       
@@ -638,7 +638,7 @@
               confirmStatusMsg.style.color = '#be123c';
               confirmStatusMsg.style.display = 'block';
               confirmLeaderBtn.disabled = false;
-              confirmLeaderBtn.textContent = '✓ Confirmar Inscrição';
+              confirmLeaderBtn.textContent = 'Confirmar inscrição';
             }
           } catch (error) {
             console.error('Erro:', error);
@@ -646,7 +646,7 @@
             confirmStatusMsg.style.color = '#be123c';
             confirmStatusMsg.style.display = 'block';
             confirmLeaderBtn.disabled = false;
-            confirmLeaderBtn.textContent = '✓ Confirmar Inscrição';
+            confirmLeaderBtn.textContent = 'Confirmar inscrição';
           }
         });
       }
