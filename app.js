@@ -349,8 +349,8 @@ app.get('/api/calculate-price', async (req, res) => {
           isActive: true
         });
 
-        // Validar se cupom de líder já foi usado (se for singleUse)
-        if (leaderCoupon && leaderCoupon.singleUse && leaderCoupon.usageCount > 0) {
+        // Cupom de líder é sempre de uso único.
+        if (leaderCoupon && leaderCoupon.usageCount > 0) {
           return res.json({
             success: false,
             error: 'Este cupom de líder já foi utilizado.',
@@ -469,8 +469,8 @@ app.post('/checkout', requireCsrf, async (req, res) => {
       });
     }
 
-    // Verificar se cupom de líder já foi usado (se for singleUse)
-    if (leaderCoupon.singleUse && leaderCoupon.usageCount > 0) {
+    // Cupom de líder é sempre de uso único.
+    if (leaderCoupon.usageCount > 0) {
       return res.status(400).render('index', {
         error: 'Este cupom de líder já foi utilizado e não pode ser reutilizado.',
         message: null,
@@ -819,7 +819,7 @@ app.post('/payment/:localPaymentId/confirm-leader', async (req, res) => {
           code: tx.leaderCouponCode,
           couponType: 'lider',
           isActive: true,
-          $or: [{ singleUse: false }, { usageCount: 0 }],
+          usageCount: 0,
           lastUsedByPaymentId: { $ne: tx.localPaymentId }
         },
         {
